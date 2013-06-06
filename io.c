@@ -5,7 +5,7 @@
 #include "acpi.h"
 
 static uchar
-ioread(struct acpiio *io, uint addr) {
+io_read(struct acpiio *io, uint addr) {
 	uvlong v;
 
 	if(pread(io->fd, &v, 1, addr) == -1)
@@ -14,7 +14,7 @@ ioread(struct acpiio *io, uint addr) {
 }
 
 static void
-iowrite(struct acpiio *io, uint addr, uvlong val) {
+io_write(struct acpiio *io, uint addr, uvlong val) {
 	if(io->dummy)
 		return;
 	if(pwrite(io->fd, &val, sizeof(uvlong), addr) == -1)
@@ -30,8 +30,8 @@ ioinit(char *name) {
 		if((io = calloc(1, sizeof(*io))) == nil)
 			sysfatal("ioinit: %r");
 		io->fd = fd;
-		io->read = ioread;
-		io->write = iowrite;
+		io->read = io_read;
+		io->write = io_write;
 		return io;
 	} 
 	return nil;

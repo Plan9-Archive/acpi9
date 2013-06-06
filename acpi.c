@@ -23,6 +23,8 @@ static struct acpiio* acpiio[8];
 
 static Tbl *tbltab[64];
 
+Tree *tree;
+
 static ushort
 get16(uchar *p){
 	return p[1]<<8 | p[0];
@@ -186,6 +188,7 @@ enumhid(void *dot, void *)
 	void *p;
 	char *id;
 	struct acpidev *dev;
+	char buf[15];
 	int i;
 
 	id = nil;
@@ -199,8 +202,18 @@ enumhid(void *dot, void *)
 				sysfatal("%r");
 			memcpy((void*)dev, (void*)&acpidev[i], sizeof(*dev));
 			dev->node = dot;
-			acpidev[i].attach(dev);
-			break;
+			memset(buf, 0, sizeof(buf));
+			sprint(buf, "%s%d", dev->name, dev->unit);
+			dev->dir = mkdir(tree->root, buf);
+			if(!acpidev[i].attach(dev)) {
+				print("fail %s\n", buf);
+				removefile(dev->dir);
+				free(dev);
+			} else {
+				acpidev[i].unit++;
+				mkfile(dev->dir, "status", dev);
+				break;
+			}
 		}
 	}
 
@@ -234,7 +247,7 @@ checksum(void *v, int n)
 }
 
 void
-main() {
+run(void) {
 	uchar *p, *tp;
 	int len, l, i;
 	Tbl *t;
@@ -296,5 +309,80 @@ main() {
 	amlenum(amlroot, "_PSS", foundpss, nil);
 	amlenum(amlroot, "_TSS", foundtss, nil);
 	*/
-	exits("");
 } 
+
+void
+usage(void)
+{
+	fprint(2, "usage: bla");
+}
+
+static void
+fsread(Req *r) 
+{
+	struct acpidev *dev;
+	char err[ERRMAX];
+	char *s;
+
+	dev = r->fid->file->aux;
+
+	if(dev && dev->status) {
+		s = dev->status(dev);
+		readstr(r, s);
+		respond(r, nil);
+		free(s);
+	} else {
+		err[0] = '\0';
+		errstr(err, sizeof(err));
+		respond(r, err);
+	}	
+}
+
+Srv fs = {
+	.read=	fsread,
+};
+
+File *
+mkdir(File *parent, char *name) {
+	return createfile(parent, name, "sys", DMDIR|0555, nil);
+}
+
+File *
+mkfile(File *parent, char *name, void *aux) {
+	return createfile(parent, name, "sys", 0444, aux);
+}
+
+void
+main(int argc, char **argv)
+{
+	ulong flag;
+	char *mtpt;
+	char err[ERRMAX];
+
+	flag = 0;
+	mtpt = "/mnt/acpi";
+	ARGBEGIN{
+	case 'D':
+		chatty9p++;
+		break;
+	case 'm':
+		mtpt = EARGF(usage());
+		break;
+	default:
+		usage();
+		break;
+	}ARGEND;
+
+	tree = fs.tree = alloctree("sys", "sys", DMDIR|0777, nil);
+	mkdir(tree->root, "foo");
+	mkfile(tree->root, "hello", nil);
+
+	err[0] = '\0';
+	errstr(err, sizeof err);
+	if(err[0])
+		sysfatal("reading archive: %s", err);
+
+	run();
+	postmountsrv(&fs, nil, mtpt, flag);
+	exits(0);
+}

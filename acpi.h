@@ -1,3 +1,8 @@
+#include <auth.h>
+#include <fcall.h>
+#include <thread.h>
+#include <9p.h>
+
 /* taken from aml.c, should be exported by aml.h, but well... */
 enum {
 	MemSpace	= 0x00,
@@ -18,10 +23,11 @@ struct acpidev {
 	int unit;
 	int (*match)(char *);
 	int (*attach)(struct acpidev *);
+	char* (*status)(struct acpidev *);
+	File *dir;
 	void *node;
 	void *data;
 };
-
 
 /* talk to the kernel */
 struct acpiio;
@@ -33,3 +39,6 @@ struct acpiio {
 };
 
 extern struct acpiio* ioinit(char *);
+
+File* mkdir(File *, char *);
+File* mkfile(File *, char *, void *);

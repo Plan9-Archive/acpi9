@@ -20,6 +20,8 @@ struct acpidev acpidev[] = {
 		acpiac_match,
 		acpiac_attach,
 		nil,
+		nil,
+		nil,
 		nil
 	},
 	{
@@ -27,6 +29,8 @@ struct acpidev acpidev[] = {
 		0,
 		acpibat_match,
 		acpibat_attach,
+		nil,
+		nil,
 		nil,
 		nil
 	}

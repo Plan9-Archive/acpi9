@@ -8,64 +8,104 @@
 enum { BatteryPresent = (1L << 4) }; 
 enum { BifUnknown = 0xffffffff }; 
 
+#define STATUSLEN 512
+enum { StringStart = 9 };
+
+char *bif_names[] = {
+	"power unit",
+	"capacity", 
+	"last capacity",
+	"technology",
+	"voltage",
+	"warning capacity",
+	"low capacity",
+	"cap. granularity",
+	"cap. granularity",
+	"model",
+	"serial",
+	"type",
+	"oem"
+};
+
+char *bst_names[] = {
+	"cur.state",
+	"cur.rate",
+	"cur.capacity",
+	"cur.voltage"
+};
+
 int 
 acpibat_match(char *id) {
 	return (id && (!strcmp(id, "PNP0C0A")));
 }
 
-static void
-acpibat_status(struct acpidev *dev) {
-	void *dot = dev->node;
+static char *
+status(struct acpidev *dev) {
+	void *dot;
+	uvlong sta;
 	void *m, **a, *p;
+	char *buf, *bp;
+	int i;
 
-	if((m = amlwalk(dot, "_BIF")) == 0) { 
-         print("bat: no _BIF\n"); 
+	dot = dev->node;
+    if((m = amlwalk(dot, "_STA")) == 0) { 
+		fprint(2, "bat: no _STA\n"); 
+		return 0; 
     } 
     if(amleval(m, "", &p) < 0) { 
-         print("bat: _BIF not working\n"); 
+    	fprint(2, "bat: _STA not working\n"); 
+        return 0; 
+    }
+    sta = amlint(p); 
+    if((sta & BatteryPresent) == 0) {
+			 buf = calloc(1, sizeof("not present")+1);
+			 sprint(buf, "not present");
+			 return buf;
+    }
+	if((m = amlwalk(dot, "_BIF")) == 0) { 
+         fprint(2, "bat: no _BIF\n"); 
+		 return nil;
+    } 
+    if(amleval(m, "", &p) < 0) { 
+         fprint(2, "bat: _BIF not working\n"); 
+		 return nil;
     } 
     a = amlval(p); 
-    print("\tpower unit: %ulld\n", amlint(a[0])); 
-    print("\tcapacity: %ulld\n", amlint(a[1])); 
-    print("\tlast capacity: %ulld\n", amlint(a[2])); 
-    print("\tvoltage: %ulld\n", amlint(a[4])); 
-    print("\tmodel: %s\n", (char*)amlval(a[9])); 
-    print("\ttype: %s\n", (char*)amlval(a[11])); 
-    print("\toem: %s\n", (char*)amlval(a[12])); 
-
+	bp = buf = calloc(1, STATUSLEN);
+	for(i = 0; i < nelem(bif_names); i++) {
+		if(i < StringStart)
+			bp += sprint(bp, "%s:\t%ulld\n", bif_names[i], amlint(a[i]));
+		else
+			bp += sprint(bp, "%s:\t%s\n", bif_names[i], (char*)amlval(a[i]));
+	}
     if((m = amlwalk(dot, "_BST")) == 0) { 
-    	print("bat: no _BST\n"); 
-		return;
+    	fprint(2, "bat: no _BST\n"); 
+		goto end;
     } 
     if(amleval(m, "", &p) < 0) { 
-    	print("bat: _BST not working\n"); 
-    	return; 
+    	fprint(2, "bat: _BST not working\n"); 
+    	goto end; 
     }        
     a = amlval(p); 
-    print("\tcur.state: %ulld\n", amlint(a[0])); 
-    print("\tcur.rate: %ulld\n", amlint(a[1])); 
-    print("\tcur.capacity: %ulld\n", amlint(a[2])); 
-    print("\tcur.voltage: %ulld\n", amlint(a[3])); 
+	for(i = 0; i < nelem(bst_names); i++)
+		bp += sprint(bp, "%s:\t%ulld\n", bst_names[i], amlint(a[i]));
+end:
+	return buf;
 }
 
 int 
-acpibat_attach(struct acpidev *dev) {       
-	uvlong sta; 
+acpibat_attach(struct acpidev *dev) {
     void *m, *dot, *p; 
 
 	dot = dev->node;
     if((m = amlwalk(dot, "_STA")) == 0) { 
-		print("bat: no _STA\n"); 
-		return -1; 
+		fprint(2, "bat: no _STA\n"); 
+		return 0; 
     } 
     if(amleval(m, "", &p) < 0) { 
-    	print("bat: _STA not working\n"); 
-        return -1; 
+    	fprint(2, "bat: _STA not working\n"); 
+        return 0; 
     } 
-    sta = amlint(p); 
-    if((sta & BatteryPresent) != 0) { 
-             print("bat:\n"); 
-			 acpibat_status(dev);
-    } 
-	return 0;
+	dev->status = status;
+	return 1;
 }
