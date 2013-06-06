@@ -1,0 +1,10 @@
+ACPI (drivers) for plan9
+========================
+
+1.apply this patch: http://plhk.ru/trash/acpi-v4.diff
+2.rebuild libaml
+3.rebuild kernel
+4.build this
+5.run ./acpi
+6.look for ac and bat in /mnt/acpi
+
