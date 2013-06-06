@@ -373,9 +373,7 @@ main(int argc, char **argv)
 		break;
 	}ARGEND;
 
-	tree = fs.tree = alloctree("sys", "sys", DMDIR|0777, nil);
-	mkdir(tree->root, "foo");
-	mkfile(tree->root, "hello", nil);
+	tree = fs.tree = alloctree("sys", "sys", DMDIR|0555, nil);
 
 	err[0] = '\0';
 	errstr(err, sizeof err);
