@@ -1,0 +1,35 @@
+/* taken from aml.c, should be exported by aml.h, but well... */
+enum {
+	MemSpace	= 0x00,
+	IoSpace		= 0x01,
+	PcicfgSpace	= 0x02,
+	EbctlSpace	= 0x03,
+	SmbusSpace	= 0x04,
+	CmosSpace	= 0x05,
+	PcibarSpace	= 0x06,
+	IpmiSpace	= 0x07,
+};
+
+/* drivers */
+struct acpidev;
+
+struct acpidev {
+	char name[10];
+	int unit;
+	int (*match)(char *);
+	int (*attach)(struct acpidev *);
+	void *node;
+	void *data;
+};
+
+
+/* talk to the kernel */
+struct acpiio;
+
+struct acpiio {
+	int fd, dummy;
+	uchar (*read)(struct acpiio *, uint);
+	void  (*write)(struct acpiio *, uint, uvlong);
+};
+
+extern struct acpiio* ioinit(char *);
