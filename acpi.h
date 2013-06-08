@@ -42,3 +42,11 @@ extern struct acpiio* ioinit(char *);
 
 File* mkdir(File *, char *);
 File* mkfile(File *, char *, void *);
+
+/* utilities */
+ushort
+get16(uchar *p);
+uint
+get32(uchar *p);
+uvlong
+get64(uchar *p);

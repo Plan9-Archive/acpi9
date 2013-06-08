@@ -25,17 +25,17 @@ static Tbl *tbltab[64];
 
 Tree *tree;
 
-static ushort
+ushort
 get16(uchar *p){
 	return p[1]<<8 | p[0];
 }
 
-static uint
+uint
 get32(uchar *p){
 	return p[3]<<24 | p[2]<<16 | p[1]<<8 | p[0];
 }
 
-static uvlong
+uvlong
 get64(uchar *p){
 	uvlong u;
 
