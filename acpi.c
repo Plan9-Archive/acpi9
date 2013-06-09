@@ -182,6 +182,38 @@ eisaid(void *v)
 	return id;
 }
 
+static int
+foundtss(void *dot, void *)
+{
+	struct acpidev *dev;
+	int i;
+	char buf[15];
+
+	for(i = 0; i < nelem(acpidev); i++) {
+		if(!strcmp(acpidev[i].name, "cpu")) {
+			if((dev = calloc(1, sizeof(*dev))) == nil)
+				sysfatal("%r");
+			memcpy((void*)dev, (void*)&acpidev[i], sizeof(*dev));
+			dev->node = dot;
+			memset(buf, 0, sizeof(buf));
+			sprint(buf, "%s%d", dev->name, dev->unit);
+			dev->dir = mkdir(tree->root, buf);
+			if(!acpidev[i].attach(dev)) {
+				print("fail %s\n", buf);
+				removefile(dev->dir);
+				free(dev);
+			} else {
+				acpidev[i].unit++;
+				mkfile(dev->dir, "status", dev);
+				if(dev->control)
+					createfile(dev->dir, "ctl", "sys", 0222, dev);
+				break;
+			}
+		}
+	}
+	return 1;
+}
+
 static int 
 enumhid(void *dot, void *)
 {
@@ -220,20 +252,13 @@ enumhid(void *dot, void *)
 	return -1;
 }
 
-/*
+
 static int 
-foundpss(void *dot, void *) {
+foundpss(void *, void *) {
 	print("pss found\n");
 	return 0;
 }
 
-
-static int
-foundtss(void *dot, void *) {
-	print("tss found\n");
-	return 0;
-}
-*/
 int
 checksum(void *v, int n)
 {
@@ -305,10 +330,8 @@ run(void) {
 
 	amlenum(amlroot, "_HID", enumhid, nil);
 
-	/*
 	amlenum(amlroot, "_PSS", foundpss, nil);
 	amlenum(amlroot, "_TSS", foundtss, nil);
-	*/
 } 
 
 void
@@ -327,7 +350,7 @@ fsread(Req *r)
 	dev = r->fid->file->aux;
 
 	if(dev && dev->status) {
-		s = dev->status(dev);
+		s = dev->status(dev, r->fid->file);
 		readstr(r, s);
 		respond(r, nil);
 		free(s);
@@ -338,8 +361,31 @@ fsread(Req *r)
 	}	
 }
 
+static void
+fswrite(Req *r) 
+{
+	struct acpidev *dev;
+	char err[ERRMAX];
+
+	dev = r->fid->file->aux;
+
+	if(dev && dev->control) {
+		r->ofcall.count = r->ifcall.count;
+		dev->control(dev, r->ifcall.data, r->ifcall.count, err);
+		if(err[0] != '\0')
+			respond(r, err);
+		else
+			respond(r, nil);
+	} else {
+		err[0] = '\0';
+		errstr(err, sizeof(err));
+		respond(r, err);
+	}
+}
+
 Srv fs = {
 	.read=	fsread,
+	.write= fswrite,
 };
 
 File *

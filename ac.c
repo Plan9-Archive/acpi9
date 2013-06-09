@@ -19,7 +19,7 @@ acpiac_match(char *id) {
 }
 
 static char *
-status(struct acpidev *dev) {
+status(struct acpidev *dev, File *) {
 	void **p;
 	void *m;
 	char *buf;

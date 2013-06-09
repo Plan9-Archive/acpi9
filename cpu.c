@@ -1,5 +1,6 @@
 #include <u.h>
 #include <libc.h>
+#include <stdio.h>
 #include <aml.h>
 #include "acpi.h"
 
@@ -31,81 +32,68 @@ struct acpicpu_pct {
 
 enum { PerfCtl = 0x199, MiscEnable = 0x1a0 };
 
-static void
-writemsr(void) {
-	int fd;
-	uchar msr[8];
-	int i;
-
-	if((fd = open("/dev/msr", ORDWR)) == -1)
-		sysfatal("%r");
-	if(pread(fd, msr, sizeof(msr), MiscEnable) != 8)
-		sysfatal("%r");
-	for(i = 0; i < sizeof(msr); i++) {
-		print("0x%x, ", msr[i]);
-	}
-	if(msr[2] & 0x1) {
-		print("Speedstep enabled!\n");
-	}
-	//return;
-	if(pread(fd, msr, sizeof(msr), PerfCtl) != 8)
-		sysfatal("%r");
-	print("Before:\n");
-	for(i = 0; i < sizeof(msr); i++) {
-		print("0x%x, ", msr[i]);
-	}
-	memset(msr, 0, 2);
-	msr[0] |= 0x7;
-	if(pwrite(fd, msr, sizeof(msr), PerfCtl) != 8)
-		sysfatal("%r");
-	print("After:\n");
-	for(i = 0; i < sizeof(msr); i++) {
-		print("0x%x, ", msr[i]);
-	}
-}
+#define MSR_LEN 8
+#define TSS_LEN 200
+#define STATUS_LEN 50
 
 int
-foundtss(void *dot, void *)
-{
+acpicpu_match(char *) {
+	return 0;
+}
+
+static void
+readmsr(uchar *msr) {
+	int fd;
+
+	if((fd = open("/dev/msr", OREAD)) == -1)
+		sysfatal("readmsr: %r");
+	if(pread(fd, msr, MSR_LEN, PerfCtl) != MSR_LEN)
+		sysfatal("readmsr: %r");
+	close(fd);
+}
+
+static void
+writemsr(uchar val) {
+	int fd;
+	uchar msr[MSR_LEN];
+
+	if((fd = open("/dev/msr", OWRITE)) == -1)
+		sysfatal("writemsr: %r");
+	readmsr(msr);	
+	memset(msr, 0, 2);
+	msr[0] |= val;
+	if(pwrite(fd, msr, MSR_LEN, PerfCtl) != MSR_LEN)
+		sysfatal("writemsr2: %r");
+	close(fd);
+}
+
+struct acpicpu {
+	struct acpicpu_tss **tss;
+	int ntss;
+	void (*set_tss)(uchar);
+	void (*get_tss)(uchar*);
+	File *ts;
+};
+
+/* we don't use _PTC, but keep it here 
+ * if sometime we want to 
+ */
+/*
+void
+getptc(void *dot) {
 	void *m;
-	void *p, **a, **pkg;
-	uchar *buf;
-	int i;
-	struct acpicpu_tss tss;
 	struct acpicpu_pct pct;
 	struct acpi_gas *gas;
-	
-	//amldebug = 1;
-	print("found tss\n");
-	if(amleval(dot, "", &p) < 0) {
-		print("tss: _TSS not working\n");
-		return 1;
-	}
-	//amldebug = 0;
-	print("len(p) = %d\n", amllen(p));
-	pkg = amlval(p);
-	print("got package len %d\n", amllen(p));
-	for(i = 0; i < amllen(p); i++) {
-		print("package len = %d\n", amllen(pkg[i]));
-		a = amlval(pkg[i]);
-		tss.tss_core_perc = amlint(a[0]);
-		tss.tss_power = amlint(a[1]);
-		tss.tss_trans_latency = amlint(a[2]);
-		tss.tss_ctrl = amlint(a[3]);
-		tss.tss_status = amlint(a[4]);
-		print("core perc: %d%% ctrl: 0x%x status: 0x%x\n", tss.tss_core_perc, tss.tss_ctrl, tss.tss_status);
-		//tss.tss_power 
-	}
+	uchar *buf;
+
 	if((m = amlwalk(dot, "^_PTC")) == 0) {
 		print("cpu: no _PTC\n");
 		return 1;
 	}
-	//amldebug = 1;
 	if(amleval(m, "", &p) < 0) {
 		print("tss: _PTC not working\n");
 		return 1;
 	}
-	amldebug =0;
 	if (amllen(p) != 2) {
 		print("invalid _PTC len\n");
 		return 1;
@@ -115,9 +103,6 @@ foundtss(void *dot, void *)
 	memcpy(&pct.status, a[1], sizeof(pct.status));
 
 	buf = a[0];
-	for(i = 0; i < 17; i++) {
-		print("%x, ", buf[i]);
-	}
 	gas = (struct acpi_gas *)(buf + 3);
 	print("_PTC(ctrl)  : %02x %04x %02x %02x %02x %02x %016ullx\n",
 	    pct.ctrl.grd_descriptor,
@@ -144,6 +129,106 @@ foundtss(void *dot, void *)
 	    gas->size,
 	    get64(buf + 7));
 	print("space = %d\n", gas->space);
-	writemsr();
+}
+*/
+
+static char *
+status(struct acpidev *dev, File *f) {
+	struct acpicpu *cpu;
+	uchar msr[8];
+	char *buf;
+	int i, n;
+
+	cpu = (struct acpicpu*)dev->data;
+	if(f == cpu->ts) {
+		if((buf = malloc(TSS_LEN)) == 0)
+			sysfatal("%r");
+		n = 0;
+		n += snprint(buf, TSS_LEN, "%%\t\t power\tctl\n");
+		for(i = 0; i < cpu->ntss; i++) {
+			n += snprint(buf+n, TSS_LEN - n, "%3d%%\t%5d\t0x%x\n",
+					cpu->tss[i]->tss_core_perc, 
+					cpu->tss[i]->tss_power,
+					cpu->tss[i]->tss_ctrl);
+		}		
+		return buf;
+	}
+	cpu->get_tss(msr);
+	for(i = 0; i < cpu->ntss; i++) {
+		if(cpu->tss[i]->tss_ctrl == msr[0])
+			break;
+	}
+	if((buf = malloc(STATUS_LEN)) == 0)
+		sysfatal("%r");
+	if(i == cpu->ntss) {
+		snprint(buf, STATUS_LEN, "unknown state\n");
+	} else {
+		snprint(buf, STATUS_LEN, "throttling: %d%%, power: %d\n",
+				cpu->tss[i]->tss_core_perc, cpu->tss[i]->tss_power);
+	}
+	return buf;
+}
+
+static void 
+control(struct acpidev *dev, char *data, u32int len, char *err)
+{
+	int i;
+	struct acpicpu *cpu;
+	uint val;
+
+	cpu = (struct acpicpu*)dev->data;
+	if (len < 3)
+		goto bad;
+	if(sscanf(data, "0x%x", &val) != 1)
+		goto bad;
+	for(i = 0; i < cpu->ntss; i++) {
+		if (val == cpu->tss[i]->tss_ctrl)
+			break;
+	}
+	if(i == cpu->ntss) {
+bad:
+		snprint(err, ERRMAX, "bad value");
+		return;
+	}
+	print("whiteyz!\n");
+	cpu->set_tss(val);
+	err[0] = '\0';
+	print("niggerz!\n");
+}
+
+int
+acpicpu_attach(struct acpidev *dev)
+{
+	void *p, **a, **pkg, *dot;
+	int i;
+	struct acpicpu *cpu;
+
+	dot = dev->node;
+	if(amleval(dot, "", &p) < 0) {
+		print("cpu: _TSS not working\n");
+		return 0;
+	}
+	if((cpu = malloc(sizeof *cpu)) == 0)
+		sysfatal("%r");
+	pkg = amlval(p);
+	cpu->ntss = amllen(p);
+	if ((cpu->tss = malloc(cpu->ntss * sizeof(struct acpicpu_tss*))) == 0)
+		sysfatal("%r");
+	for(i = 0; i < amllen(p); i++) {
+		a = amlval(pkg[i]);
+		if ((cpu->tss[i] = malloc(sizeof(struct acpicpu_tss))) == 0)
+			sysfatal("%r");
+		cpu->tss[i]->tss_core_perc = amlint(a[0]);
+		cpu->tss[i]->tss_power = amlint(a[1]);
+		cpu->tss[i]->tss_trans_latency = amlint(a[2]);
+		cpu->tss[i]->tss_ctrl = amlint(a[3]);
+		cpu->tss[i]->tss_status = amlint(a[4]);
+	}
+	cpu->set_tss = writemsr;
+	cpu->get_tss = readmsr;
+	dev->data = cpu;
+	dev->status = status;
+	dev->control = control;	
+	cpu->ts = createfile(dev->dir, "throttling", "sys", 0444, dev);
 	return 1;
 }

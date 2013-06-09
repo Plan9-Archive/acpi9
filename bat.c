@@ -40,7 +40,7 @@ acpibat_match(char *id) {
 }
 
 static char *
-status(struct acpidev *dev) {
+status(struct acpidev *dev, File *) {
 	void *dot;
 	uvlong sta;
 	void *m, **a, *p;

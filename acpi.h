@@ -19,14 +19,15 @@ enum {
 struct acpidev;
 
 struct acpidev {
-	char name[10];
-	int unit;
-	int (*match)(char *);
-	int (*attach)(struct acpidev *);
-	char* (*status)(struct acpidev *);
-	File *dir;
-	void *node;
-	void *data;
+	char 	name[10];
+	int 	unit;
+	int		(*match)(char *);
+	int	 	(*attach)(struct acpidev *);
+	char* 	(*status)(struct acpidev *, File *);
+	void 	(*control)(struct acpidev *, char *, u32int, char *);
+	File 	*dir;
+	void 	*node;
+	void 	*data;
 };
 
 /* talk to the kernel */

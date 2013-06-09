@@ -11,7 +11,8 @@ int acpibat_attach(struct acpidev *);
 int acpibat_match(char *);
 
 /* CPU */
-int foundtss(void *, void *);
+int acpicpu_match(char *);
+int acpicpu_attach(struct acpidev *);
 
 struct acpidev acpidev[] = {
 	{
@@ -19,19 +20,17 @@ struct acpidev acpidev[] = {
 		0,	
 		acpiac_match,
 		acpiac_attach,
-		nil,
-		nil,
-		nil,
-		nil
 	},
 	{
 		"bat",
 		0,
 		acpibat_match,
 		acpibat_attach,
-		nil,
-		nil,
-		nil,
-		nil
+	},
+	{
+		"cpu",
+		0,
+		acpicpu_match,
+		acpicpu_attach,
 	}
 };
