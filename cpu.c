@@ -190,10 +190,8 @@ bad:
 		snprint(err, ERRMAX, "bad value");
 		return;
 	}
-	print("whiteyz!\n");
 	cpu->set_tss(val);
 	err[0] = '\0';
-	print("niggerz!\n");
 }
 
 int
