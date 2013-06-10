@@ -124,6 +124,9 @@ acpibat_attach(struct acpidev *dev) {
         return 0; 
     } 
 	dev->status = status;
+	/* this file is used to emulate apm battery file, mount it 
+	 * at /mnt/apm
+	 */
 	dev->data = createfile(dev->dir, "battery", "sys", 0444, dev);
 	return 1;
 }

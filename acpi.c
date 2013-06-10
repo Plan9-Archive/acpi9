@@ -121,8 +121,6 @@ findtable(uchar *tp, char name[4], int len) {
 		t = (Tbl*)tp;
 		if(memcmp(t->sig, name, 4) == 0)
 			return t;
-		else 
-			print("[%c%c%c%c]\n", t->sig[0], t->sig[1], t->sig[2], t->sig[3]);
 	}
 	return nil;
 }
@@ -255,7 +253,7 @@ enumhid(void *dot, void *)
 
 static int 
 foundpss(void *, void *) {
-	print("pss found\n");
+	print("_PSS found but not yet supported\n");
 	return 0;
 }
 
@@ -278,7 +276,6 @@ run(void) {
 	Tbl *t;
 
 	p = gettables(&len);
-	print("tables @ [0x%p, 0x%p], len %d\n", p, p+len, len);
 
 	acpiio[EbctlSpace] = ioinit("/dev/acpiec");
 	acpiio[MemSpace] = ioinit("/dev/acpimem");
@@ -288,16 +285,18 @@ run(void) {
 
 	if(t = findtable(tp, "DSDT", len - (tp - p))) {
 		amlload(t->data, tbldlen(t));
-		print("found dsdt\n");
+	} else {
+		fprint(2, "DSDT not found\n");
 	}
+
 	tp = p;
 	i = 0;
 	while(t = findtable(tp, "SSDT", len - (tp - p))) {
 			amlload(t->data, tbldlen(t));
-			print("found ssdt @ %p\n", t);
 			i++;
 			tp += 4;
 	} 
+	/* we can't trust t->len */
 	if (!t) {
 		while((tp < p + len)) {
 			if(memcmp(tp, "SSDT", 4)) {
@@ -306,12 +305,9 @@ run(void) {
 				t = (Tbl*)tp;
 				l = get32(t->len);
 				if (l < len && !checksum(tp, l)) {
-					print("SSDT.%d@%p\n", i, t);
-					/*if (i == 1 || i == 4)
-						amldebug = 1;*/
 					amlload(t->data, tbldlen(t));
 					amldebug = 0;
-					tp += 4; //get32(t->len);
+					tp += 4;
 					i++;
 				} else {
 					tp += 4;
@@ -319,6 +315,8 @@ run(void) {
 			}
 		}
 	}
+	if(i == 0)
+		fprint(2, "SSDT not found\n");
 	/* 
 	 * Bad things happen when doing actual writes
 	 */
@@ -327,9 +325,9 @@ run(void) {
  	acpiio[EbctlSpace]->dummy = 0;
 
 	/* look for other ACPI devices */
-
 	amlenum(amlroot, "_HID", enumhid, nil);
 
+	/* cpu power and throttling states */
 	amlenum(amlroot, "_PSS", foundpss, nil);
 	amlenum(amlroot, "_TSS", foundtss, nil);
 } 
@@ -424,7 +422,7 @@ main(int argc, char **argv)
 	err[0] = '\0';
 	errstr(err, sizeof err);
 	if(err[0])
-		sysfatal("reading archive: %s", err);
+		sysfatal("acpi: %s", err);
 
 	run();
 	postmountsrv(&fs, nil, mtpt, flag);

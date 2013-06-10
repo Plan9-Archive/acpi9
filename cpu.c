@@ -38,9 +38,11 @@ enum { PerfCtl = 0x199, MiscEnable = 0x1a0 };
 
 int
 acpicpu_match(char *) {
+	/* never attach to _HID */
 	return 0;
 }
 
+/* These two are for Intel, don't try it on AMD */
 static void
 readmsr(uchar *msr) {
 	int fd;
@@ -76,7 +78,9 @@ struct acpicpu {
 };
 
 /* we don't use _PTC, but keep it here 
- * if sometime we want to 
+ * if sometime we want to.
+ * Why not? It tells us to use i/o port
+ * which doesn't actually work. 
  */
 /*
 void
@@ -140,6 +144,7 @@ status(struct acpidev *dev, File *f) {
 	int i, n;
 
 	cpu = (struct acpicpu*)dev->data;
+	/* cpu%d->throttling file */
 	if(f == cpu->ts) {
 		if((buf = malloc(TSS_LEN)) == 0)
 			sysfatal("%r");

@@ -27,11 +27,11 @@ status(struct acpidev *dev, File *) {
 	m = ((struct ac*)dev->data)->psr_node;
 
 	if(m == nil) {
-		print("must not happen\n");
+		fprint(2, "must not happen\n");
 		return nil;
 	}
 	if(amleval(m, "", &p) < 0) {
-		print("ac: _PSR not working\n");
+		fprint(2, "ac: _PSR not working\n");
 		return nil;
 	}
 	if((buf = calloc(1, STATUSLEN)) == nil) {
