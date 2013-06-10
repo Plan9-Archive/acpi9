@@ -296,21 +296,20 @@ run(void) {
 			i++;
 			tp += 4;
 	} 
-	/* we can't trust t->len */
+	/* we can't trust t->len, bruteforce search */
 	if (!t) {
 		while((tp < p + len)) {
 			if(memcmp(tp, "SSDT", 4)) {
-				tp += 4;
+				tp += 1;
 			} else {
 				t = (Tbl*)tp;
 				l = get32(t->len);
 				if (l < len && !checksum(tp, l)) {
 					amlload(t->data, tbldlen(t));
-					amldebug = 0;
 					tp += 4;
 					i++;
 				} else {
-					tp += 4;
+					tp += 1;
 				}
 			}
 		}
