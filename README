@@ -7,4 +7,5 @@ ACPI (drivers) for plan9
 4.build this
 5.run ./acpi
 6.look for ac and bat in /mnt/acpi
-
+7.to make stats -b work mount your /mnt/acpi/bat0 (or whatever) at /mnt/apm
+	bind -a /mnt/acpi/bat0 /mnt/apm
