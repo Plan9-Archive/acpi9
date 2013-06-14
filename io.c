@@ -4,17 +4,14 @@
 
 #include "acpi.h"
 
-static uchar
-io_read(struct acpiio *io, uint addr) {
-	uvlong v;
-
-	if(pread(io->fd, &v, 1, addr) == -1)
+static void
+io_read(struct acpiio *io, uvlong addr, uvlong len, uchar *p) {
+	if(pread(io->fd, p, len, addr) == -1)
 		sysfatal("read: %r");
-	return v;
 }
 
 static void
-io_write(struct acpiio *io, uint addr, uvlong val) {
+io_write(struct acpiio *io, uvlong addr, uvlong val) {
 	if(io->dummy)
 		return;
 	if(pwrite(io->fd, &val, sizeof(uvlong), addr) == -1)

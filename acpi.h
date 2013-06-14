@@ -35,8 +35,8 @@ struct acpiio;
 
 struct acpiio {
 	int fd, dummy;
-	uchar (*read)(struct acpiio *, uint);
-	void  (*write)(struct acpiio *, uint, uvlong);
+	void (*read)(struct acpiio *, uvlong, uvlong, uchar*);
+	void (*write)(struct acpiio *, uvlong, uvlong);
 };
 
 extern struct acpiio* ioinit(char *);

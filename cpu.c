@@ -12,6 +12,16 @@ struct acpicpu_tss {
 	uint	tss_status;
 };
 
+struct acpicpu_pss {
+	uint	pss_core_perc;
+	uint	pss_power;
+	uint	pss_trans_latency;
+	uint 	pss_bus_latency;
+	uint	pss_ctrl;
+	uint	pss_status;
+};
+
+
 struct acpi_gas {
 	uchar space;
 	uchar bitwidth;
@@ -66,12 +76,17 @@ writemsr(uchar val) {
 	msr[0] |= val;
 	if(pwrite(fd, msr, MSR_LEN, PerfCtl) != MSR_LEN)
 		sysfatal("writemsr2: %r");
+	readmsr(msr);
+	if(msr[0] & val)
+		print("0x%x written successfully\n", val);
 	close(fd);
 }
 
 struct acpicpu {
 	struct acpicpu_tss **tss;
+	struct acpicpu_pss **pss;
 	int ntss;
+	int npss;
 	void (*set_tss)(uchar);
 	void (*get_tss)(uchar*);
 	File *ts;
@@ -141,7 +156,7 @@ status(struct acpidev *dev, File *f) {
 	struct acpicpu *cpu;
 	uchar msr[8];
 	char *buf;
-	int i, n;
+	int i, n, pss = 0;
 
 	cpu = (struct acpicpu*)dev->data;
 	/* cpu%d->throttling file */
@@ -163,12 +178,24 @@ status(struct acpidev *dev, File *f) {
 		if(cpu->tss[i]->tss_ctrl == msr[0])
 			break;
 	}
+	if(i == cpu->ntss) {
+		for(i = 0; i < cpu->npss; i++) {
+			if(cpu->pss[i]->pss_ctrl == msr[0])
+				break;
+		}
+		if(i < cpu->npss)
+			pss = 1;
+	}
 	if((buf = malloc(STATUS_LEN)) == 0)
 		sysfatal("%r");
-	if(i == cpu->ntss) {
-		snprint(buf, STATUS_LEN, "unknown state\n");
+	if(pss == 0) {
+		snprint(buf, STATUS_LEN, "unknown state 0x%x\n", msr[0]);
 	} else {
-		snprint(buf, STATUS_LEN, "throttling: %d%%, power: %d\n",
+		if(pss)
+			snprint(buf, STATUS_LEN, "%dMhz, power: %d\n",
+				cpu->pss[i]->pss_core_perc, cpu->pss[i]->pss_power);
+		else
+			snprint(buf, STATUS_LEN, "throttling: %d%%, power: %d\n",
 				cpu->tss[i]->tss_core_perc, cpu->tss[i]->tss_power);
 	}
 	return buf;
@@ -183,20 +210,113 @@ control(struct acpidev *dev, char *data, u32int len, char *err)
 
 	cpu = (struct acpicpu*)dev->data;
 	if (len < 3)
-		goto bad;
+		goto notfound;
 	if(sscanf(data, "0x%x", &val) != 1)
-		goto bad;
+		goto notfound;
 	for(i = 0; i < cpu->ntss; i++) {
 		if (val == cpu->tss[i]->tss_ctrl)
 			break;
 	}
-	if(i == cpu->ntss) {
-bad:
-		snprint(err, ERRMAX, "bad value");
-		return;
+	if(i < cpu->ntss)
+		goto found;
+
+	for(i = 0; i < cpu->npss; i++) {
+		if (val == cpu->pss[i]->pss_ctrl)
+			break;
 	}
+	if(i == cpu->npss)
+		goto notfound;
+found:
 	cpu->set_tss(val);
 	err[0] = '\0';
+	return;
+notfound:
+	snprint(err, ERRMAX, "bad value");
+}
+
+void
+evalpss(struct acpidev *dev, void *dot) {
+	void *p;
+	int i;
+	void **a;
+	void **pkg;
+	struct acpicpu *cpu = dev->data;
+
+	if(amleval(dot, "", &p) < 0) {
+		print("cpu: _PSS not working\n");
+		return;
+	}
+	pkg = amlval(p);
+	cpu->npss = amllen(p);
+	if ((cpu->pss = malloc(cpu->npss * sizeof(struct acpicpu_pss*))) == 0)
+		sysfatal("%r");
+	for(i = 0; i < cpu->npss; i++) {
+		a = amlval(pkg[i]);
+		if ((cpu->pss[i] = malloc(sizeof(struct acpicpu_pss))) == 0)
+			sysfatal("%r");
+		cpu->pss[i]->pss_core_perc = amlint(a[0]);
+		cpu->pss[i]->pss_power = amlint(a[1]);
+		cpu->pss[i]->pss_trans_latency = amlint(a[2]);
+		cpu->pss[i]->pss_bus_latency = amlint(a[3]);
+		cpu->pss[i]->pss_ctrl = amlint(a[4]);
+		cpu->pss[i]->pss_status = amlint(a[5]);
+		//print("pss: %ulldMhz, ctrl: %ullx\n", amlint(a[0]), amlint(a[4]));
+	}
+}
+
+void
+evalpdc(struct acpidev *dev) {
+	void *m;
+	uint buf[3];
+	void *b, *oscb;
+	char *p;
+#define ACPI_PDC_REVID		0x1
+#define ACPI_PDC_SMP		0xa
+#define ACPI_PDC_MSR		0x1
+
+/* _PDC Intel capabilities flags from linux */
+#define ACPI_PDC_P_FFH		0x0001
+#define ACPI_PDC_C_C1_HALT	0x0002
+#define ACPI_PDC_T_FFH		0x0004
+#define ACPI_PDC_SMP_C1PT	0x0008
+#define ACPI_PDC_SMP_C2C3	0x0010
+#define ACPI_PDC_SMP_P_SWCOORD	0x0020
+#define ACPI_PDC_SMP_C_SWCOORD	0x0040
+#define ACPI_PDC_SMP_T_SWCOORD	0x0080
+#define ACPI_PDC_C_C1_FFH	0x0100
+#define ACPI_PDC_C_C2C3_FFH	0x0200
+
+	if((m = amlwalk(dev->node, "^_PDC")) == 0) {
+		print("no PDC");
+		return;
+	}
+	buf[0] = ACPI_PDC_REVID;
+	buf[1] = 1;
+	buf[2] = ACPI_PDC_C_C1_HALT | ACPI_PDC_P_FFH | ACPI_PDC_C_C1_FFH
+	    | ACPI_PDC_C_C2C3_FFH | ACPI_PDC_SMP_P_SWCOORD | ACPI_PDC_SMP_C2C3
+	    | ACPI_PDC_SMP_C1PT;
+	b = amlmkbuf(buf, sizeof(buf));
+	if(amleval(m, "b", b, &p) < 0) {
+		print("pdc not working");
+		return;
+	}
+	static uchar cpu_oscuuid[] = { 0x16, 0xA6, 0x77, 0x40, 0x0C, 0x29,
+					   0xBE, 0x47, 0x9E, 0xBD, 0xD8, 0x70,
+					   0x58, 0x71, 0x39, 0x53 };
+	if((m = amlwalk(dev->node, "^_OSC")) == 0) {
+		print("no OSC");
+		return;
+	}
+	oscb = amlmkbuf(cpu_oscuuid, sizeof(cpu_oscuuid));
+	if(amleval(m, "biib", oscb, 1, 1, b, &p) < 0) {
+		print("bad _OSC");
+	}
+	if((m = amlwalk(dev->node, "^_PSS")) == 0) {
+		print("no PSS\n");
+		return;
+	}
+	print("got some _PSS\n");
+	evalpss(dev, m);
 }
 
 int
@@ -233,5 +353,6 @@ acpicpu_attach(struct acpidev *dev)
 	dev->status = status;
 	dev->control = control;	
 	cpu->ts = createfile(dev->dir, "throttling", "sys", 0444, dev);
+	evalpdc(dev);
 	return 1;
 }

@@ -44,18 +44,18 @@ get64(uchar *p){
 }
 
 void 
-acpi_read(uchar space, int off, int, uvlong *buf)
+acpi_read(uchar space, uvlong off, uvlong len, uvlong *buf)
 {
-	//print("acpi_read: off 0x%x len %d\n", off, len);
+	print("acpi_read: space: %d off 0x%ullx len %ulld\n", space, off, len);
 
 	if (acpiio[space] != nil)
-		*buf = acpiio[space]->read(acpiio[space], off);
+		acpiio[space]->read(acpiio[space], off, len, (uchar*)buf);
 }
 
 void 
-acpi_write(uchar space, int off, int, uvlong val)
+acpi_write(uchar space, uvlong off, uvlong len, uvlong val)
 {
-	//print("acpiec_write: off 0x%x len %d\n", off, len);
+	print("acpiec_write: space: %d off 0x%ullx len %ulld\n", space, off, len);
 
 	if (acpiio[space] != nil)
 		acpiio[space]->write(acpiio[space], off, val);

@@ -30,10 +30,12 @@ status(struct acpidev *dev, File *) {
 		fprint(2, "must not happen\n");
 		return nil;
 	}
+
 	if(amleval(m, "", &p) < 0) {
 		fprint(2, "ac: _PSR not working\n");
 		return nil;
 	}
+
 	if((buf = calloc(1, STATUSLEN)) == nil) {
 		fprint(2, "%r");
 		return nil;
