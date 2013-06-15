@@ -46,7 +46,7 @@ get64(uchar *p){
 void 
 acpi_read(uchar space, uvlong off, uvlong len, uvlong *buf)
 {
-	print("acpi_read: space: %d off 0x%ullx len %ulld\n", space, off, len);
+	//print("acpi_read: space: %d off 0x%ullx len %ulld\n", space, off, len);
 
 	if (acpiio[space] != nil)
 		acpiio[space]->read(acpiio[space], off, len, (uchar*)buf);
@@ -55,7 +55,7 @@ acpi_read(uchar space, uvlong off, uvlong len, uvlong *buf)
 void 
 acpi_write(uchar space, uvlong off, uvlong len, uvlong val)
 {
-	print("acpiec_write: space: %d off 0x%ullx len %ulld\n", space, off, len);
+	//print("acpiec_write: space: %d off 0x%ullx len %ulld\n", space, off, len);
 
 	if (acpiio[space] != nil)
 		acpiio[space]->write(acpiio[space], off, val);
@@ -181,7 +181,7 @@ eisaid(void *v)
 }
 
 static int
-foundtss(void *dot, void *)
+foundpdc(void *dot, void *)
 {
 	struct acpidev *dev;
 	int i;
@@ -248,13 +248,6 @@ enumhid(void *dot, void *)
 	}
 
 	return -1;
-}
-
-
-static int 
-foundpss(void *, void *) {
-	print("_PSS found but not yet supported\n");
-	return 0;
 }
 
 int
@@ -327,8 +320,7 @@ run(void) {
 	amlenum(amlroot, "_HID", enumhid, nil);
 
 	/* cpu power and throttling states */
-	amlenum(amlroot, "_PSS", foundpss, nil);
-	amlenum(amlroot, "_TSS", foundtss, nil);
+	amlenum(amlroot, "_PDC", foundpdc, nil);
 } 
 
 void

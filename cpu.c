@@ -4,6 +4,22 @@
 #include <aml.h>
 #include "acpi.h"
 
+#define ACPI_PDC_REVID		0x1
+#define ACPI_PDC_SMP		0xa
+#define ACPI_PDC_MSR		0x1
+
+/* _PDC Intel capabilities flags from linux */
+#define ACPI_PDC_P_FFH		0x0001
+#define ACPI_PDC_C_C1_HALT	0x0002
+#define ACPI_PDC_T_FFH		0x0004
+#define ACPI_PDC_SMP_C1PT	0x0008
+#define ACPI_PDC_SMP_C2C3	0x0010
+#define ACPI_PDC_SMP_P_SWCOORD	0x0020
+#define ACPI_PDC_SMP_C_SWCOORD	0x0040
+#define ACPI_PDC_SMP_T_SWCOORD	0x0080
+#define ACPI_PDC_C_C1_FFH	0x0100
+#define ACPI_PDC_C_C2C3_FFH	0x0200
+
 struct acpicpu_tss {
 	uint	tss_core_perc;
 	uint	tss_power;
@@ -13,7 +29,7 @@ struct acpicpu_tss {
 };
 
 struct acpicpu_pss {
-	uint	pss_core_perc;
+	uint	pss_core_freq;
 	uint	pss_power;
 	uint	pss_trans_latency;
 	uint 	pss_bus_latency;
@@ -38,6 +54,17 @@ struct acpi_grd {
 struct acpicpu_pct {
 	struct acpi_grd ctrl;
 	struct acpi_grd status;
+};
+
+struct acpicpu {
+	struct acpicpu_tss **tss;
+	struct acpicpu_pss **pss;
+	int ntss;
+	int npss;
+	void (*set_tss)(uchar);
+	void (*get_tss)(uchar*);
+	File *throttling;
+	File *powerstates;
 };
 
 enum { PerfCtl = 0x199, MiscEnable = 0x1a0 };
@@ -81,16 +108,6 @@ writemsr(uchar val) {
 		print("0x%x written successfully\n", val);
 	close(fd);
 }
-
-struct acpicpu {
-	struct acpicpu_tss **tss;
-	struct acpicpu_pss **pss;
-	int ntss;
-	int npss;
-	void (*set_tss)(uchar);
-	void (*get_tss)(uchar*);
-	File *ts;
-};
 
 /* we don't use _PTC, but keep it here 
  * if sometime we want to.
@@ -152,15 +169,14 @@ getptc(void *dot) {
 */
 
 static char *
-status(struct acpidev *dev, File *f) {
+status(struct acpidev *dev, File *file) {
 	struct acpicpu *cpu;
 	uchar msr[8];
 	char *buf;
 	int i, n, pss = 0;
 
 	cpu = (struct acpicpu*)dev->data;
-	/* cpu%d->throttling file */
-	if(f == cpu->ts) {
+	if(file == cpu->throttling) {
 		if((buf = malloc(TSS_LEN)) == 0)
 			sysfatal("%r");
 		n = 0;
@@ -170,6 +186,19 @@ status(struct acpidev *dev, File *f) {
 					cpu->tss[i]->tss_core_perc, 
 					cpu->tss[i]->tss_power,
 					cpu->tss[i]->tss_ctrl);
+		}		
+		return buf;
+	}
+	if(file == cpu->powerstates) {
+		if((buf = malloc(TSS_LEN)) == 0)
+			sysfatal("%r");
+		n = 0;
+		n += snprint(buf, TSS_LEN, "Mhz\t\tpower\tctl\n");
+		for(i = 0; i < cpu->npss; i++) {
+			n += snprint(buf+n, TSS_LEN - n, "%4d\t%5d\t0x%x\n",
+					cpu->pss[i]->pss_core_freq, 
+					cpu->pss[i]->pss_power,
+					cpu->pss[i]->pss_ctrl);
 		}		
 		return buf;
 	}
@@ -193,7 +222,7 @@ status(struct acpidev *dev, File *f) {
 	} else {
 		if(pss)
 			snprint(buf, STATUS_LEN, "%dMhz, power: %d\n",
-				cpu->pss[i]->pss_core_perc, cpu->pss[i]->pss_power);
+				cpu->pss[i]->pss_core_freq, cpu->pss[i]->pss_power);
 		else
 			snprint(buf, STATUS_LEN, "throttling: %d%%, power: %d\n",
 				cpu->tss[i]->tss_core_perc, cpu->tss[i]->tss_power);
@@ -234,17 +263,21 @@ notfound:
 	snprint(err, ERRMAX, "bad value");
 }
 
-void
-evalpss(struct acpidev *dev, void *dot) {
-	void *p;
+static int
+evalpss(struct acpidev *dev) {
+	void *p, *m;
 	int i;
 	void **a;
 	void **pkg;
 	struct acpicpu *cpu = dev->data;
 
-	if(amleval(dot, "", &p) < 0) {
-		print("cpu: _PSS not working\n");
-		return;
+	if((m = amlwalk(dev->node, "^_PSS")) == 0) {
+		fprint(2, "no _PSS\n");
+		return 0;
+	}
+	if(amleval(m, "", &p) < 0) {
+		fprint(2, "cpu: _PSS not working\n");
+		return 0;
 	}
 	pkg = amlval(p);
 	cpu->npss = amllen(p);
@@ -254,85 +287,30 @@ evalpss(struct acpidev *dev, void *dot) {
 		a = amlval(pkg[i]);
 		if ((cpu->pss[i] = malloc(sizeof(struct acpicpu_pss))) == 0)
 			sysfatal("%r");
-		cpu->pss[i]->pss_core_perc = amlint(a[0]);
+		cpu->pss[i]->pss_core_freq = amlint(a[0]);
 		cpu->pss[i]->pss_power = amlint(a[1]);
 		cpu->pss[i]->pss_trans_latency = amlint(a[2]);
 		cpu->pss[i]->pss_bus_latency = amlint(a[3]);
 		cpu->pss[i]->pss_ctrl = amlint(a[4]);
 		cpu->pss[i]->pss_status = amlint(a[5]);
-		//print("pss: %ulldMhz, ctrl: %ullx\n", amlint(a[0]), amlint(a[4]));
 	}
+	return 1;
 }
 
-void
-evalpdc(struct acpidev *dev) {
-	void *m;
-	uint buf[3];
-	void *b, *oscb;
-	char *p;
-#define ACPI_PDC_REVID		0x1
-#define ACPI_PDC_SMP		0xa
-#define ACPI_PDC_MSR		0x1
-
-/* _PDC Intel capabilities flags from linux */
-#define ACPI_PDC_P_FFH		0x0001
-#define ACPI_PDC_C_C1_HALT	0x0002
-#define ACPI_PDC_T_FFH		0x0004
-#define ACPI_PDC_SMP_C1PT	0x0008
-#define ACPI_PDC_SMP_C2C3	0x0010
-#define ACPI_PDC_SMP_P_SWCOORD	0x0020
-#define ACPI_PDC_SMP_C_SWCOORD	0x0040
-#define ACPI_PDC_SMP_T_SWCOORD	0x0080
-#define ACPI_PDC_C_C1_FFH	0x0100
-#define ACPI_PDC_C_C2C3_FFH	0x0200
-
-	if((m = amlwalk(dev->node, "^_PDC")) == 0) {
-		print("no PDC");
-		return;
-	}
-	buf[0] = ACPI_PDC_REVID;
-	buf[1] = 1;
-	buf[2] = ACPI_PDC_C_C1_HALT | ACPI_PDC_P_FFH | ACPI_PDC_C_C1_FFH
-	    | ACPI_PDC_C_C2C3_FFH | ACPI_PDC_SMP_P_SWCOORD | ACPI_PDC_SMP_C2C3
-	    | ACPI_PDC_SMP_C1PT;
-	b = amlmkbuf(buf, sizeof(buf));
-	if(amleval(m, "b", b, &p) < 0) {
-		print("pdc not working");
-		return;
-	}
-	static uchar cpu_oscuuid[] = { 0x16, 0xA6, 0x77, 0x40, 0x0C, 0x29,
-					   0xBE, 0x47, 0x9E, 0xBD, 0xD8, 0x70,
-					   0x58, 0x71, 0x39, 0x53 };
-	if((m = amlwalk(dev->node, "^_OSC")) == 0) {
-		print("no OSC");
-		return;
-	}
-	oscb = amlmkbuf(cpu_oscuuid, sizeof(cpu_oscuuid));
-	if(amleval(m, "biib", oscb, 1, 1, b, &p) < 0) {
-		print("bad _OSC");
-	}
-	if((m = amlwalk(dev->node, "^_PSS")) == 0) {
-		print("no PSS\n");
-		return;
-	}
-	print("got some _PSS\n");
-	evalpss(dev, m);
-}
-
-int
-acpicpu_attach(struct acpidev *dev)
-{
-	void *p, **a, **pkg, *dot;
+static int
+evaltss(struct acpidev *dev) {
+	struct acpicpu *cpu = dev->data;
+	void *p, **a, **pkg, *m;
 	int i;
-	struct acpicpu *cpu;
 
-	dot = dev->node;
-	if(amleval(dot, "", &p) < 0) {
-		print("cpu: _TSS not working\n");
+	if((m = amlwalk(dev->node, "^_TSS")) == 0) {
+		fprint(2, "cpu: no _TSS");
 		return 0;
 	}
-	if((cpu = malloc(sizeof *cpu)) == 0)
-		sysfatal("%r");
+	if(amleval(m, "", &p) < 0) {
+		fprint(2, "cpu: _TSS not working\n");
+		return 0;
+	}
 	pkg = amlval(p);
 	cpu->ntss = amllen(p);
 	if ((cpu->tss = malloc(cpu->ntss * sizeof(struct acpicpu_tss*))) == 0)
@@ -347,12 +325,64 @@ acpicpu_attach(struct acpidev *dev)
 		cpu->tss[i]->tss_ctrl = amlint(a[3]);
 		cpu->tss[i]->tss_status = amlint(a[4]);
 	}
+	return 1;
+}
+
+static int
+evalpdc(struct acpidev *dev) {
+	void *m;
+	uint buf[3];
+	void *b, *oscb;
+	char *p;
+	static uchar cpu_oscuuid[] = { 0x16, 0xA6, 0x77, 0x40, 0x0C, 0x29,
+					   0xBE, 0x47, 0x9E, 0xBD, 0xD8, 0x70,
+					   0x58, 0x71, 0x39, 0x53 };
+
+	m = dev->node;
+	buf[0] = ACPI_PDC_REVID;
+	buf[1] = 1;
+	buf[2] = ACPI_PDC_C_C1_HALT | ACPI_PDC_P_FFH | ACPI_PDC_C_C1_FFH
+	    | ACPI_PDC_C_C2C3_FFH | ACPI_PDC_SMP_P_SWCOORD | ACPI_PDC_SMP_C2C3
+	    | ACPI_PDC_SMP_C1PT;
+	b = amlmkbuf(buf, sizeof(buf));
+	if(amleval(m, "b", b, &p) < 0) {
+		print("_PDC not working");
+		return 0;
+	}
+
+	if((m = amlwalk(dev->node, "^_OSC")) == 0) {
+		print("no _OSC");
+		return 0;
+	}
+	oscb = amlmkbuf(cpu_oscuuid, sizeof(cpu_oscuuid));
+	if(amleval(m, "biib", oscb, 1, 1, b, &p) < 0) {
+		print("_OSC not working");
+		return 0;
+	}
+	return 1;
+}
+
+int
+acpicpu_attach(struct acpidev *dev)
+{
+	struct acpicpu *cpu;
+
+	if(evalpdc(dev) == 0)
+		return 0;
+	if((cpu = calloc(1, sizeof *cpu)) == 0)
+		sysfatal("%r");
+	dev->data = cpu;
+	if(!evalpss(dev) && !evaltss(dev)) {
+		free(cpu);
+		return 0;
+	}
 	cpu->set_tss = writemsr;
 	cpu->get_tss = readmsr;
-	dev->data = cpu;
 	dev->status = status;
 	dev->control = control;	
-	cpu->ts = createfile(dev->dir, "throttling", "sys", 0444, dev);
-	evalpdc(dev);
+	if(cpu->ntss != 0)
+		cpu->throttling = createfile(dev->dir, "throttling", "sys", 0444, dev);
+	if(cpu->pss != 0)
+		cpu->powerstates = createfile(dev->dir, "powerstates", "sys", 0444, dev);
 	return 1;
 }
