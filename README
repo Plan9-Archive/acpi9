@@ -1,7 +1,7 @@
 ACPI (drivers) for plan9
 ========================
 
-1.apply this patch: http://plhk.ru/trash/acpi-v4.diff
+1.apply this patch: http://plhk.ru/trash/acpi-v8.diff
 2.rebuild libaml
 3.rebuild kernel
 4.build this
@@ -9,3 +9,9 @@ ACPI (drivers) for plan9
 6.look for ac and bat in /mnt/acpi
 7.to make stats -b work mount your /mnt/acpi/bat0 (or whatever) at /mnt/apm
 	bind -a /mnt/acpi/bat0 /mnt/apm
+8.to enable cpu powerstates control (intel CPUs)
+	1.find a line like this in /dev/kmesg: "smi_cmd: 0xb2 acpi_enable: 0xf0 pstate_cnt: 0x80"
+	2.io -w $smi_cmd $pstate_cnt
+	3.now you can write ctl value from /mnt/acpi/cpu0/powerstates for desired frequency to /mnt/acpi/cpu0/ctl:
+		echo 0x7 > /mnt/acpi/cpu0/ctl
+	4.check if it worked by doing cat /mnt/acpi/cpu0/status

@@ -344,12 +344,12 @@ evalpdc(struct acpidev *dev) {
 	buf[2] = ACPI_PDC_C_C1_HALT | ACPI_PDC_P_FFH | ACPI_PDC_C_C1_FFH
 	    | ACPI_PDC_C_C2C3_FFH | ACPI_PDC_SMP_P_SWCOORD | ACPI_PDC_SMP_C2C3
 	    | ACPI_PDC_SMP_C1PT;
+
 	b = amlmkbuf(buf, sizeof(buf));
 	if(amleval(m, "b", b, &p) < 0) {
 		print("_PDC not working");
 		return 0;
 	}
-
 	if((m = amlwalk(dev->node, "^_OSC")) == 0) {
 		print("no _OSC");
 		return 0;
