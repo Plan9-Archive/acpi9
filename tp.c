@@ -3,21 +3,18 @@
 #include <aml.h>
 #include "acpi.h"
 
-#define ACPI_DEV_IBM	"IBM0068"
-#define ACPI_DEV_LENOVO	"LEN0068"
-
 #define	THINKPAD_HKEY_VERSION		0x0100
 
-#define	THINKPAD_CMOS_VOLUME_DOWN	0x00
-#define	THINKPAD_CMOS_VOLUME_UP		0x01
-#define	THINKPAD_CMOS_VOLUME_MUTE	0x02
-#define	THINKPAD_CMOS_BRIGHTNESS_UP	0x04
-#define	THINKPAD_CMOS_BRIGHTNESS_DOWN	0x05
+enum { VolumeDown, 
+	   VolumeUp, 
+	   VolumeMute,
+	   BrightnessUp = 0x04, 
+	   BrightnessDown };
 
 /* ACPI thinkpad driver */
 int 
 acpitp_match(char *id) {
-	return (id && (!strcmp(id, ACPI_DEV_IBM) || !strcmp(id, ACPI_DEV_LENOVO)));
+	return (id && (!strcmp(id, "IBM0068") || !strcmp(id, "LEN0068")));
 }
 
 static void
@@ -34,12 +31,12 @@ tp_cmos(struct acpidev *dev, uchar cmd)
 static void 
 control(struct acpidev *dev, char *data, u32int len, char *err) {
 	if(!strncmp(data, "down", len)) {
-		tp_cmos(dev, THINKPAD_CMOS_BRIGHTNESS_DOWN);
+		tp_cmos(dev, BrightnessDown);
 		err[0] = '\0';
 		return;
 	}
 	if(!strncmp(data, "up", len)) {
-		tp_cmos(dev, THINKPAD_CMOS_BRIGHTNESS_UP);
+		tp_cmos(dev, BrightnessUp);
 		err[0] = '\0';
 		return;
 	}
