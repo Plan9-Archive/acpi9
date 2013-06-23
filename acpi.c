@@ -241,7 +241,10 @@ enumhid(void *dot, void *)
 				free(dev);
 			} else {
 				acpidev[i].unit++;
-				mkfile(dev->dir, "status", dev);
+				if(dev->status)
+					mkfile(dev->dir, "status", dev);
+				if(dev->control)
+					createfile(dev->dir, "ctl", "sys", 0222, dev);
 				break;
 			}
 		}
@@ -271,6 +274,7 @@ run(void) {
 	p = gettables(&len);
 
 	acpiio[EbctlSpace] = ioinit("/dev/acpiec");
+	acpiio[IoSpace] = ioinit("/dev/iob");
 	acpiio[MemSpace] = ioinit("/dev/acpimem");
 	amlinit();
 

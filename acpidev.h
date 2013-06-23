@@ -14,6 +14,10 @@ int acpibat_match(char *);
 int acpicpu_match(char *);
 int acpicpu_attach(struct acpidev *);
 
+/* Thinkpad  */
+int acpitp_match(char *);
+int acpitp_attach(struct acpidev *);
+
 struct acpidev acpidev[] = {
 	{
 		"ac",
@@ -32,5 +36,11 @@ struct acpidev acpidev[] = {
 		0,
 		acpicpu_match,
 		acpicpu_attach,
+	},
+	{
+		"thinkpad",
+		0,
+		acpitp_match,
+		acpitp_attach,
 	}
 };
