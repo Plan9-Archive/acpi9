@@ -5,11 +5,20 @@
 
 #define	THINKPAD_HKEY_VERSION		0x0100
 
-enum { VolumeDown, 
-	   VolumeUp, 
-	   VolumeMute,
-	   BrightnessUp = 0x04, 
-	   BrightnessDown };
+enum { 
+	VolumeDown, 
+	VolumeUp, 
+	VolumeMute,
+	BrightnessUp = 0x04, 
+	BrightnessDown
+};
+
+enum { 
+	FanLowByte = 0x84,
+	FanHighByte = 0x85
+};
+
+#define STATUSLEN 50
 
 /* ACPI thinkpad driver */
 int 
@@ -43,6 +52,20 @@ control(struct acpidev *dev, char *data, u32int len, char *err) {
 	snprint(err, ERRMAX, "bad value");
 }
 
+static char *
+status(struct acpidev *, File *) {
+	uvlong hi, lo;
+	char *buf;
+
+	if((buf = calloc(1, STATUSLEN)) == 0)
+		sysfatal("%r");
+
+	acpi_read(EbctlSpace, FanLowByte, 1, &lo);
+	acpi_read(EbctlSpace, FanHighByte, 1, &hi);
+	snprint(buf, STATUSLEN, "Fan RPM: %ulld\n", (hi << 8) | lo);
+	return buf;
+}
+
 int 
 acpitp_attach(struct acpidev *dev) {
 	void *m, *dot, *p;
@@ -57,5 +80,6 @@ acpitp_attach(struct acpidev *dev) {
 	if(amlint(p) != THINKPAD_HKEY_VERSION)
 			return 0;
 	dev->control = control;
+	dev->status = status;
 	return 1;
 }
