@@ -67,7 +67,10 @@ struct acpicpu {
 	File *powerstates;
 };
 
-enum { PerfCtl = 0x199, MiscEnable = 0x1a0 };
+enum {
+	PerfStatus = 0x198, 
+	PerfCtl = 0x199 
+};
 
 #define MSR_LEN 8
 #define TSS_LEN 200
@@ -86,7 +89,7 @@ readmsr(uchar *msr) {
 
 	if((fd = open("/dev/msr", OREAD)) == -1)
 		sysfatal("readmsr: %r");
-	if(pread(fd, msr, MSR_LEN, PerfCtl) != MSR_LEN)
+	if(pread(fd, msr, MSR_LEN, PerfStatus) != MSR_LEN)
 		sysfatal("readmsr: %r");
 	close(fd);
 }
@@ -95,17 +98,24 @@ static void
 writemsr(uchar val) {
 	int fd;
 	uchar msr[MSR_LEN];
+	int i;
 
-	if((fd = open("/dev/msr", OWRITE)) == -1)
+	if((fd = open("/dev/msr", ORDWR)) == -1)
 		sysfatal("writemsr: %r");
-	readmsr(msr);	
+	if(pread(fd, msr, MSR_LEN, PerfCtl) != MSR_LEN)
+		sysfatal("readmsr: %r");
 	memset(msr, 0, 2);
 	msr[0] |= val;
-	if(pwrite(fd, msr, MSR_LEN, PerfCtl) != MSR_LEN)
-		sysfatal("writemsr2: %r");
-	readmsr(msr);
-	if(msr[0] & val)
-		print("0x%x written successfully\n", val);
+	for(i = 0; i < 10; i++) {
+		if(pwrite(fd, msr, MSR_LEN, PerfCtl) != MSR_LEN)
+			sysfatal("writemsr2: %r");
+		readmsr(msr);
+		if(msr[0] & val)
+			break;
+		fprint(2, "wrote 0x%x got 0x%x, retrying\n", val, msr[0]);
+	}
+	if(msr[0] & val == 0)
+		fprint(2, "giving up\n");
 	close(fd);
 }
 
