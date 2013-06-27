@@ -5,13 +5,15 @@
 #include "acpi.h"
 
 static void
-io_read(struct acpiio *io, uvlong addr, uvlong len, uchar *p) {
+io_read(struct acpiio *io, uvlong addr, uvlong len, uchar *p)
+{
 	if(pread(io->fd, p, len, addr) == -1)
 		sysfatal("read: %r");
 }
 
 static void
-io_write(struct acpiio *io, uvlong addr, uvlong val) {
+io_write(struct acpiio *io, uvlong addr, uvlong val)
+{
 	if(io->dummy)
 		return;
 	if(pwrite(io->fd, &val, sizeof(uvlong), addr) == -1)
@@ -19,7 +21,8 @@ io_write(struct acpiio *io, uvlong addr, uvlong val) {
 }
 
 struct acpiio*
-ioinit(char *name) {
+ioinit(char *name)
+{
 	int fd;
 	struct acpiio *io;
 

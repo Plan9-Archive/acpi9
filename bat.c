@@ -5,8 +5,10 @@
 
 /* ACPI battery driver */
 
-enum { BatteryPresent = (1L << 4) }; 
-enum { BifUnknown = 0xffffffff }; 
+enum { 
+	BatteryPresent = (1L << 4),
+	BifUnknown = 0xffffffff
+}; 
 
 #define STATUSLEN 512
 enum { StringStart = 9 };
@@ -35,12 +37,14 @@ char *bst_names[] = {
 };
 
 int 
-acpibat_match(char *id) {
+acpibat_match(char *id)
+{
 	return (id && (!strcmp(id, "PNP0C0A")));
 }
 
 static char *
-status(struct acpidev *dev, File *f) {
+status(struct acpidev *dev, File *f)
+{
 	void *dot;
 	uvlong sta;
 	void *m, **a, *p;
@@ -111,7 +115,8 @@ apmemu:
 }
 
 int 
-acpibat_attach(struct acpidev *dev) {
+acpibat_attach(struct acpidev *dev)
+{
     void *m, *dot, *p; 
 
 	dot = dev->node;

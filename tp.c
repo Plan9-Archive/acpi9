@@ -22,7 +22,8 @@ enum {
 
 /* ACPI thinkpad driver */
 int 
-acpitp_match(char *id) {
+acpitp_match(char *id)
+{
 	return (id && (!strcmp(id, "IBM0068") || !strcmp(id, "LEN0068")));
 }
 
@@ -38,7 +39,8 @@ tp_cmos(struct acpidev *dev, uchar cmd)
 }
 
 static void 
-control(struct acpidev *dev, char *data, u32int len, char *err) {
+control(struct acpidev *dev, char *data, u32int len, char *err)
+{
 	if(!strncmp(data, "down", len)) {
 		tp_cmos(dev, BrightnessDown);
 		err[0] = '\0';
@@ -53,7 +55,8 @@ control(struct acpidev *dev, char *data, u32int len, char *err) {
 }
 
 static char *
-status(struct acpidev *, File *) {
+status(struct acpidev *, File *)
+{
 	uvlong hi, lo;
 	char *buf;
 
@@ -67,7 +70,8 @@ status(struct acpidev *, File *) {
 }
 
 int 
-acpitp_attach(struct acpidev *dev) {
+acpitp_attach(struct acpidev *dev)
+{
 	void *m, *dot, *p;
 
 	dot = dev->node;

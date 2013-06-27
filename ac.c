@@ -14,12 +14,14 @@ enum { Offline, Online };
 #define STATUSLEN 10
 
 int 
-acpiac_match(char *id) {
+acpiac_match(char *id)
+{
 	return (id && (!strcmp(id, "ACPI0003")));
 }
 
 static char *
-status(struct acpidev *dev, File *) {
+status(struct acpidev *dev, File *)
+{
 	void **p;
 	void *m;
 	char *buf;
@@ -54,7 +56,8 @@ status(struct acpidev *dev, File *) {
 }
 
 int
-acpiac_attach(struct acpidev *dev) {
+acpiac_attach(struct acpidev *dev) 
+{
 	void *m, *dot;
 	struct ac *ac;
 

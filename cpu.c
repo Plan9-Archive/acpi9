@@ -77,14 +77,16 @@ enum {
 #define STATUS_LEN 50
 
 int
-acpicpu_match(char *) {
+acpicpu_match(char *)
+{
 	/* never attach to _HID */
 	return 0;
 }
 
 /* These two are for Intel, don't try it on AMD */
 static void
-readmsr(uchar *msr, uint reg) {
+readmsr(uchar *msr, uint reg)
+{
 	int fd;
 
 	if((fd = open("/dev/msr", OREAD)) == -1)
@@ -95,12 +97,14 @@ readmsr(uchar *msr, uint reg) {
 }
 
 static void
-readpss(uchar *msr) {
+readpss(uchar *msr)
+{
 	readmsr(msr, PerfStatus);
 }
 
 static void
-writemsr(uchar val) {
+writemsr(uchar val)
+{
 	int fd;
 	uchar msr[MSR_LEN];
 
@@ -124,7 +128,8 @@ writemsr(uchar val) {
  */
 /*
 void
-getptc(void *dot) {
+getptc(void *dot)
+{
 	void *m;
 	struct acpicpu_pct pct;
 	struct acpi_gas *gas;
@@ -177,7 +182,8 @@ getptc(void *dot) {
 */
 
 static char *
-status(struct acpidev *dev, File *file) {
+status(struct acpidev *dev, File *file)
+{
 	struct acpicpu *cpu;
 	uchar msr[8];
 	char *buf;
@@ -272,7 +278,8 @@ notfound:
 }
 
 static int
-evalpss(struct acpidev *dev) {
+evalpss(struct acpidev *dev)
+{
 	void *p, *m;
 	int i;
 	void **a;
@@ -306,7 +313,8 @@ evalpss(struct acpidev *dev) {
 }
 
 static int
-evaltss(struct acpidev *dev) {
+evaltss(struct acpidev *dev)
+{
 	struct acpicpu *cpu = dev->data;
 	void *p, **a, **pkg, *m;
 	int i;
@@ -337,7 +345,8 @@ evaltss(struct acpidev *dev) {
 }
 
 static int
-evalpdc(struct acpidev *dev) {
+evalpdc(struct acpidev *dev)
+{
 	void *m;
 	uint buf[3];
 	void *b, *oscb;

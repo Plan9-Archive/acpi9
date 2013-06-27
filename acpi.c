@@ -26,17 +26,20 @@ static Tbl *tbltab[64];
 Tree *tree;
 
 ushort
-get16(uchar *p){
+get16(uchar *p)
+{
 	return p[1]<<8 | p[0];
 }
 
 uint
-get32(uchar *p){
+get32(uchar *p)
+{
 	return p[3]<<24 | p[2]<<16 | p[1]<<8 | p[0];
 }
 
 uvlong
-get64(uchar *p){
+get64(uchar *p)
+{
 	uvlong u;
 
 	u = get32(p+4);
@@ -68,7 +71,8 @@ acpi_delay(int n)
 }
 
 void*
-amlalloc(int n){
+amlalloc(int n)
+{
 	void *p;
 
 	if((p = malloc(n)) == nil) 
@@ -78,12 +82,14 @@ amlalloc(int n){
 }
 
 void
-amlfree(void *p){
+amlfree(void *p)
+{
 	free(p);
 }
 
 void*
-gettables(int *len) {
+gettables(int *len)
+{
 	int fd, n, size;
 	uvlong off;
 	void *tables;
@@ -112,7 +118,8 @@ gettables(int *len) {
 }
 
 Tbl*
-findtable(uchar *tp, char name[4], int len) {
+findtable(uchar *tp, char name[4], int len)
+{
 	Tbl *t;
 	uchar *ti;
 	
@@ -126,7 +133,8 @@ findtable(uchar *tp, char name[4], int len) {
 }
 
 static uint
-tbldlen(Tbl *t){
+tbldlen(Tbl *t)
+{
 	return get32(t->len) - sizeof(Tbl);
 }
 
@@ -253,7 +261,7 @@ enumhid(void *dot, void *)
 	return -1;
 }
 
-int
+static int
 checksum(void *v, int n)
 {
 	uchar *p, s;
@@ -266,7 +274,8 @@ checksum(void *v, int n)
 }
 
 void
-run(void) {
+run(void)
+{
 	uchar *p, *tp;
 	int len, l, i;
 	Tbl *t;
@@ -329,7 +338,7 @@ run(void) {
 	amlenum(amlroot, "_PDC", foundpdc, nil);
 } 
 
-void
+static void
 usage(void)
 {
 	fprint(2, "usage: bla");
@@ -384,12 +393,14 @@ Srv fs = {
 };
 
 File *
-mkdir(File *parent, char *name) {
+mkdir(File *parent, char *name)
+{
 	return createfile(parent, name, "sys", DMDIR|0555, nil);
 }
 
 File *
-mkfile(File *parent, char *name, void *aux) {
+mkfile(File *parent, char *name, void *aux)
+{
 	return createfile(parent, name, "sys", 0444, aux);
 }
 
