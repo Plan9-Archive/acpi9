@@ -67,9 +67,9 @@ struct acpicpu {
 	File *powerstates;
 };
 
-enum {
+enum { 
 	PerfStatus = 0x198, 
-	PerfCtl = 0x199 
+	PerfCtl = 0x199
 };
 
 #define MSR_LEN 8
@@ -84,38 +84,36 @@ acpicpu_match(char *) {
 
 /* These two are for Intel, don't try it on AMD */
 static void
-readmsr(uchar *msr) {
+readmsr(uchar *msr, uint reg) {
 	int fd;
 
 	if((fd = open("/dev/msr", OREAD)) == -1)
 		sysfatal("readmsr: %r");
-	if(pread(fd, msr, MSR_LEN, PerfStatus) != MSR_LEN)
+	if(pread(fd, msr, MSR_LEN, reg) != MSR_LEN)
 		sysfatal("readmsr: %r");
 	close(fd);
+}
+
+static void
+readpss(uchar *msr) {
+	readmsr(msr, PerfStatus);
 }
 
 static void
 writemsr(uchar val) {
 	int fd;
 	uchar msr[MSR_LEN];
-	int i;
 
-	if((fd = open("/dev/msr", ORDWR)) == -1)
+	if((fd = open("/dev/msr", OWRITE)) == -1)
 		sysfatal("writemsr: %r");
-	if(pread(fd, msr, MSR_LEN, PerfCtl) != MSR_LEN)
-		sysfatal("readmsr: %r");
+	readmsr(msr, PerfCtl);	
 	memset(msr, 0, 2);
 	msr[0] |= val;
-	for(i = 0; i < 10; i++) {
-		if(pwrite(fd, msr, MSR_LEN, PerfCtl) != MSR_LEN)
-			sysfatal("writemsr2: %r");
-		readmsr(msr);
-		if(msr[0] & val)
-			break;
-		fprint(2, "wrote 0x%x got 0x%x, retrying\n", val, msr[0]);
-	}
-	if(msr[0] & val == 0)
-		fprint(2, "giving up\n");
+	if(pwrite(fd, msr, MSR_LEN, PerfCtl) != MSR_LEN)
+		sysfatal("writemsr2: %r");
+	readpss(msr);
+	if(msr[0] & val)
+		print("0x%x written successfully\n", val);
 	close(fd);
 }
 
@@ -387,7 +385,7 @@ acpicpu_attach(struct acpidev *dev)
 		return 0;
 	}
 	cpu->set_tss = writemsr;
-	cpu->get_tss = readmsr;
+	cpu->get_tss = readpss;
 	dev->status = status;
 	dev->control = control;	
 	if(cpu->ntss != 0)
