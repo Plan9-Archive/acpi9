@@ -1,7 +1,7 @@
 ACPI (drivers) for plan9
 ========================
 
-1.apply this patch: http://plhk.ru/trash/acpi-v8.diff
+1.apply this patch: http://plhk.ru/trash/acpi-v9.diff
 2.rebuild libaml
 3.rebuild kernel
 4.build this
