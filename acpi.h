@@ -3,18 +3,6 @@
 #include <thread.h>
 #include <9p.h>
 
-/* taken from aml.c, should be exported by aml.h, but well... */
-enum {
-	MemSpace	= 0x00,
-	IoSpace		= 0x01,
-	PcicfgSpace	= 0x02,
-	EbctlSpace	= 0x03,
-	SmbusSpace	= 0x04,
-	CmosSpace	= 0x05,
-	PcibarSpace	= 0x06,
-	IpmiSpace	= 0x07,
-};
-
 /* drivers */
 struct acpidev;
 
@@ -31,23 +19,22 @@ struct acpidev {
 };
 
 /* talk to the kernel */
-struct acpiio;
+typedef struct acpiio AcpiIo;
 
+struct acpiio;
 struct acpiio {
 	int fd, dummy;
-	void (*read)(struct acpiio *, uvlong, uvlong, uchar*);
-	void (*write)(struct acpiio *, uvlong, uvlong);
+	void (*read)(AcpiIo *, uvlong, uvlong, uchar*);
+	void (*write)(AcpiIo *, uvlong, uvlong, uvlong);
 };
 
-extern struct acpiio* ioinit(char *);
+extern struct acpiio* portinit(char*);
+extern struct acpiio* meminit(char*);
 
 File* mkdir(File *, char *);
 File* mkfile(File *, char *, void *);
 
 /* utilities */
-ushort
-get16(uchar *p);
-uint
-get32(uchar *p);
-uvlong
-get64(uchar *p);
+ushort get16(uchar *p);
+uint get32(uchar *p);
+uvlong get64(uchar *p);

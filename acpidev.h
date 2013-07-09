@@ -2,6 +2,11 @@
 
 /* drivers */
 
+/* Embedded Controller */
+void acpiec_init(void*, void*);
+void ecread(AcpiIo*, uvlong, uvlong, uchar*);
+void ecwrite(AcpiIo*,uvlong, uvlong, uvlong);
+
 /* AC */
 int acpiac_attach(struct acpidev *);
 int acpiac_match(char *);

@@ -19,60 +19,51 @@ struct Tbl {
 };
 
 /* for each defined space */
-static struct acpiio* acpiio[8];
+static AcpiIo* acpiio[8];
 
 static Tbl *tbltab[64];
 
 Tree *tree;
 
 ushort
-get16(uchar *p)
-{
+get16(uchar *p){
 	return p[1]<<8 | p[0];
 }
 
 uint
-get32(uchar *p)
-{
+get32(uchar *p){
 	return p[3]<<24 | p[2]<<16 | p[1]<<8 | p[0];
 }
 
 uvlong
-get64(uchar *p)
-{
+get64(uchar *p){
 	uvlong u;
 
 	u = get32(p+4);
 	return u<<32 | get32(p);
 }
 
-void 
-acpi_read(uchar space, uvlong off, uvlong len, uvlong *buf)
-{
-	//print("acpi_read: space: %d off 0x%ullx len %ulld\n", space, off, len);
-
-	if (acpiio[space] != nil)
+void
+amlio(uchar space, char op, uvlong *buf, uvlong off, int len){
+	if(acpiio[space] == nil){
+		/*print("space[%d] io not implemented\n", space);*/
+		return;
+	}
+	if(op == 'R'){
 		acpiio[space]->read(acpiio[space], off, len, (uchar*)buf);
+		/*print("amlio[R]: space=%d off=%ulld len=%d %ulld\n", space, off, len, buf[0]);*/
+	}else
+		acpiio[space]->write(acpiio[space], off, len, *buf);
 }
 
 void 
-acpi_write(uchar space, uvlong off, uvlong len, uvlong val)
-{
-	//print("acpiec_write: space: %d off 0x%ullx len %ulld\n", space, off, len);
-
-	if (acpiio[space] != nil)
-		acpiio[space]->write(acpiio[space], off, val);
-}
-
-void 
-acpi_delay(int n) 
+amldelay(int n) 
 {
 	sleep(n);
 }
 
 void*
-amlalloc(int n)
-{
+amlalloc(int n){
 	void *p;
 
 	if((p = malloc(n)) == nil) 
@@ -82,14 +73,12 @@ amlalloc(int n)
 }
 
 void
-amlfree(void *p)
-{
+amlfree(void *p){
 	free(p);
 }
 
 void*
-gettables(int *len)
-{
+gettables(int *len) {
 	int fd, n, size;
 	uvlong off;
 	void *tables;
@@ -118,8 +107,7 @@ gettables(int *len)
 }
 
 Tbl*
-findtable(uchar *tp, char name[4], int len)
-{
+findtable(uchar *tp, char name[4], int len) {
 	Tbl *t;
 	uchar *ti;
 	
@@ -133,8 +121,7 @@ findtable(uchar *tp, char name[4], int len)
 }
 
 static uint
-tbldlen(Tbl *t)
-{
+tbldlen(Tbl *t){
 	return get32(t->len) - sizeof(Tbl);
 }
 
@@ -261,7 +248,7 @@ enumhid(void *dot, void *)
 	return -1;
 }
 
-static int
+int
 checksum(void *v, int n)
 {
 	uchar *p, s;
@@ -274,19 +261,26 @@ checksum(void *v, int n)
 }
 
 void
-run(void)
-{
+run(void) {
 	uchar *p, *tp;
 	int len, l, i;
 	Tbl *t;
 
 	p = gettables(&len);
 
-	acpiio[EbctlSpace] = ioinit("/dev/acpiec");
-	acpiio[IoSpace] = ioinit("/dev/iob");
-	acpiio[MemSpace] = ioinit("/dev/acpimem");
+	acpiio[IoSpace] = portinit("/dev/iob");
+	acpiio[MemSpace] = meminit("/dev/acpimem");
+
 	amlinit();
 
+	tp = p;
+
+	if(t = findtable(tp, "ECDT", len - (tp - p))) {
+			acpiec_init(nil, t->data);
+			acpiio[EbctlSpace] = calloc(1, sizeof(*acpiio[EbctlSpace]));
+			acpiio[EbctlSpace]->write = ecwrite;
+			acpiio[EbctlSpace]->read = ecread;
+	}
 	tp = p;
 
 	if(t = findtable(tp, "DSDT", len - (tp - p))) {
@@ -325,11 +319,9 @@ run(void)
 	/* 
 	 * Bad things happen when doing actual writes
 	 */
-	acpiio[IoSpace]->dummy = 1;
 	acpiio[EbctlSpace]->dummy = 1;
 	amlenum(amlroot, "_INI", enumini, nil);
  	acpiio[EbctlSpace]->dummy = 0;
-	acpiio[IoSpace]->dummy = 0;
 
 	/* look for other ACPI devices */
 	amlenum(amlroot, "_HID", enumhid, nil);
@@ -338,7 +330,7 @@ run(void)
 	amlenum(amlroot, "_PDC", foundpdc, nil);
 } 
 
-static void
+void
 usage(void)
 {
 	fprint(2, "usage: bla");
@@ -393,14 +385,12 @@ Srv fs = {
 };
 
 File *
-mkdir(File *parent, char *name)
-{
+mkdir(File *parent, char *name) {
 	return createfile(parent, name, "sys", DMDIR|0555, nil);
 }
 
 File *
-mkfile(File *parent, char *name, void *aux)
-{
+mkfile(File *parent, char *name, void *aux) {
 	return createfile(parent, name, "sys", 0444, aux);
 }
 
