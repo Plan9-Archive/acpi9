@@ -5,10 +5,7 @@
 
 #define	THINKPAD_HKEY_VERSION		0x0100
 
-enum { 
-	VolumeDown, 
-	VolumeUp, 
-	VolumeMute,
+enum {
 	BrightnessUp = 0x04, 
 	BrightnessDown
 };
@@ -41,17 +38,19 @@ tp_cmos(struct acpidev *dev, uchar cmd)
 static void 
 control(struct acpidev *dev, char *data, u32int len, char *err)
 {
-	if(!strncmp(data, "down", len)) {
-		tp_cmos(dev, BrightnessDown);
-		err[0] = '\0';
-		return;
-	}
-	if(!strncmp(data, "up", len)) {
+	if(!strncmp(data, "brighter", len-1)) {
 		tp_cmos(dev, BrightnessUp);
-		err[0] = '\0';
-		return;
+		goto success;
+	}
+	if(!strncmp(data, "dimmer", len-1)) {
+		tp_cmos(dev, BrightnessDown);
+		goto success;
 	}
 	snprint(err, ERRMAX, "bad value");
+	return;
+success:
+	err[0] = '\0';
+	return;
 }
 
 static char *
