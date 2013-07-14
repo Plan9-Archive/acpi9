@@ -3,7 +3,7 @@ ACPI (drivers) for plan9
 
 1.apply this patch: http://plhk.ru/trash/acpi-v10.diff
 2.rebuild libaml
-3.rebuild kernel; reboot with *acpi=2
+3.rebuild kernel; install it and reboot with *acpi=2
 4.build this
 5.run ./acpi
 6.look for ac and bat in /mnt/acpi
