@@ -74,11 +74,11 @@ status(struct acpidev *dev, File *f)
 	if((m = amlwalk(dot, "_BIF")) == 0) { 
          fprint(2, "bat: no _BIF\n"); 
 		 return nil;
-    } 
+    }
     if(amleval(m, "", &p) < 0) { 
          fprint(2, "bat: _BIF not working\n"); 
 		 return nil;
-    } 
+    }
     a = amlval(p); 
 	bp = buf = calloc(1, STATUSLEN);
 	if (dev->data == f) {

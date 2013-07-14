@@ -4,32 +4,28 @@
 
 #include "acpi.h"
 
-static void
+static int
 memread(struct acpiio *io, uvlong addr, uvlong len, uchar *p) {
-	if(pread(io->fd, p, len, addr) == -1)
-		sysfatal("read: %r");
+	return pread(io->fd, p, len, addr);
 }
 
-static void
+static int
 memwrite(struct acpiio *io, uvlong addr, uvlong len, uvlong val) {
 	if(io->dummy)
-		return;
-	if(pwrite(io->fd, &val, len, addr) == -1)
-		sysfatal("write: %r");
+		return -1;
+	return pwrite(io->fd, &val, len, addr);
 }
 
-static void
+static int
 portread(struct acpiio *io, uvlong addr, uvlong, uchar *p) {
-	if(pread(io->fd, p, 1, addr) != 1)
-		sysfatal("read: %r");
+	return pread(io->fd, p, 1, addr);
 }
 
-static void
+static int
 portwrite(struct acpiio *io, uvlong addr, uvlong, uvlong val) {
 	if(io->dummy)
-		return;
-	if(pwrite(io->fd, &val, 1, addr) != 1)
-		sysfatal("write: %r");
+		return -1;
+	return pwrite(io->fd, &val, 1, addr);
 }
 
 static struct acpiio*

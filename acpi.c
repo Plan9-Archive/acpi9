@@ -43,17 +43,17 @@ get64(uchar *p){
 	return u<<32 | get32(p);
 }
 
-void
+int
 amlio(uchar space, char op, uvlong *buf, uvlong off, int len){
 	if(acpiio[space] == nil){
 		/*print("space[%d] io not implemented\n", space);*/
-		return;
+		return -1;
 	}
 	if(op == 'R'){
-		acpiio[space]->read(acpiio[space], off, len, (uchar*)buf);
+		return acpiio[space]->read(acpiio[space], off, len, (uchar*)buf);
 		/*print("amlio[R]: space=%d off=%ulld len=%d %ulld\n", space, off, len, buf[0]);*/
 	}else
-		acpiio[space]->write(acpiio[space], off, len, *buf);
+		return acpiio[space]->write(acpiio[space], off, len, *buf);
 }
 
 void 

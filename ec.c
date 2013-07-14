@@ -46,8 +46,8 @@ static uchar
 inb(int off){
 	uvlong val;
 
-	amlio(IoSpace, 'R', &val, off, 8);
-	return (uchar)val;
+	amlio(IoSpace, 'R', &val, off, 1);
+	return val;
 }
 
 static void
@@ -55,7 +55,7 @@ outb(int off, uchar v){
 	uvlong val;
 
 	val = v;
-	amlio(IoSpace, 'W', &val, off, 8);
+	amlio(IoSpace, 'W', &val, off, 1);
 }
 
 static void
@@ -117,16 +117,18 @@ acpiec_write(uchar addr, uvlong val)
 	}
 }
 
-void
+int
 ecread(AcpiIo*, uvlong addr, uvlong, uchar *p){
 	*p = acpiec_read(addr);
+	return 1;
 }
 
-void
+int
 ecwrite(AcpiIo *io, uvlong addr, uvlong, uvlong val){
 	if(io->dummy)
-		return;
+		return -1;
 	acpiec_write(addr, val);
+	return 1;
 }
 	
 static int
