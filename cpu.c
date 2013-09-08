@@ -362,7 +362,8 @@ evalpdc(struct acpidev *dev)
 	    | ACPI_PDC_C_C2C3_FFH | ACPI_PDC_SMP_P_SWCOORD | ACPI_PDC_SMP_C2C3
 	    | ACPI_PDC_SMP_C1PT;
 
-	b = amlmkbuf(buf, sizeof(buf));
+	b = amlnew('b', sizeof(buf));
+	memcpy(b, buf, sizeof(buf));
 	if(amleval(m, "b", b, &p) < 0) {
 		print("_PDC not working");
 		return 0;
@@ -371,7 +372,8 @@ evalpdc(struct acpidev *dev)
 		print("no _OSC");
 		return 0;
 	}
-	oscb = amlmkbuf(cpu_oscuuid, sizeof(cpu_oscuuid));
+	oscb = amlnew('b', sizeof(cpu_oscuuid));
+	memcpy(oscb, cpu_oscuuid, sizeof(cpu_oscuuid));
 	if(amleval(m, "biib", oscb, 1, 1, b, &p) < 0) {
 		print("_OSC not working");
 		return 0;
