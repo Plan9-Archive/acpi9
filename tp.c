@@ -62,8 +62,8 @@ status(struct acpidev *, File *)
 	if((buf = calloc(1, STATUSLEN)) == 0)
 		sysfatal("%r");
 
-	amlio(EbctlSpace, 'R', &lo, FanLowByte, 8);
-	amlio(EbctlSpace, 'R', &hi, FanHighByte, 8);
+	amlio(EbctlSpace, 'R', &lo, FanLowByte, 1);
+	amlio(EbctlSpace, 'R', &hi, FanHighByte, 1);
 	snprint(buf, STATUSLEN, "Fan RPM: %ulld\n", (hi << 8) | lo);
 	return buf;
 }
