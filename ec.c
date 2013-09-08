@@ -118,15 +118,16 @@ acpiec_write(uchar addr, uvlong val)
 }
 
 int
-ecread(AcpiIo*, uvlong addr, uvlong, uchar *p){
-	*p = acpiec_read(addr);
+ecread(AcpiIo*, void *p, int addr, int){
+	*(uchar*)p = acpiec_read(addr);
 	return 1;
 }
 
 int
-ecwrite(AcpiIo *io, uvlong addr, uvlong, uvlong val){
+ecwrite(AcpiIo *io, void *p, int addr, int){
 	if(io->dummy)
 		return -1;
+	uvlong val = *(uvlong*)p;
 	acpiec_write(addr, val);
 	return 1;
 }

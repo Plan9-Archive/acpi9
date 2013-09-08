@@ -24,8 +24,8 @@ typedef struct acpiio AcpiIo;
 struct acpiio;
 struct acpiio {
 	int fd, dummy;
-	int (*read)(AcpiIo *, uvlong, uvlong, uchar*);
-	int (*write)(AcpiIo *, uvlong, uvlong, uvlong);
+	int (*read)(AcpiIo*, void*, int, int);
+	int (*write)(AcpiIo*, void*, int, int);
 };
 
 extern struct acpiio* portinit(char*);
@@ -38,3 +38,5 @@ File* mkfile(File *, char *, void *);
 ushort get16(uchar *p);
 uint get32(uchar *p);
 uvlong get64(uchar *p);
+
+int amlio(uchar, char, void*, int, int);

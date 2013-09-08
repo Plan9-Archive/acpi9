@@ -5,26 +5,30 @@
 #include "acpi.h"
 
 static int
-memread(struct acpiio *io, uvlong addr, uvlong len, uchar *p) {
+memread(struct acpiio *io, void *p, int addr, int len) {
+	print("memread: 0x%x\n", addr);
 	return pread(io->fd, p, len, addr);
 }
 
 static int
-memwrite(struct acpiio *io, uvlong addr, uvlong len, uvlong val) {
+memwrite(struct acpiio *io, void *p, int addr, int len) {
 	if(io->dummy)
 		return -1;
+	uvlong val = *(uvlong*)p;
+	print("memwrite: 0x%x\n", addr);
 	return pwrite(io->fd, &val, len, addr);
 }
 
 static int
-portread(struct acpiio *io, uvlong addr, uvlong, uchar *p) {
+portread(struct acpiio *io, void *p, int addr, int) {
 	return pread(io->fd, p, 1, addr);
 }
 
 static int
-portwrite(struct acpiio *io, uvlong addr, uvlong, uvlong val) {
+portwrite(struct acpiio *io, void *p, int addr, int) {
 	if(io->dummy)
 		return -1;
+	uvlong val = *(uvlong*)p;
 	return pwrite(io->fd, &val, 1, addr);
 }
 
