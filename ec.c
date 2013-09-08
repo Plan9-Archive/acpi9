@@ -64,7 +64,7 @@ acpiec_wait(uchar mask, uchar val)
 	uchar stat;
 
 	while((stat = inb(ec.cmd) & mask) != val) {
-		if (stat & Burst)
+		//if (stat & Burst)
 			amldelay(1);
 	}
 }
@@ -118,8 +118,9 @@ acpiec_write(uchar addr, uvlong val)
 }
 
 int
-ecread(Amlio*, void *p, int len, int addr){
-	*(uchar*)p = acpiec_read(addr);
+ecread(Amlio *io, void *p, int, int addr){
+	//print("ecread addr:%d len:%d\n", (int)io->off + addr, len);
+	*(uchar*)p = acpiec_read(io->off + addr);
 	return 1;
 }
 
@@ -129,8 +130,9 @@ ecwrite(Amlio *io, void *p, int, int addr){
 		*(char*)p = 0;
 		return -1;
 	}
+	print("ecwrite addr = %d\n", addr);
 	uvlong val = *(uvlong*)p;
-	acpiec_write(addr, val);
+	acpiec_write(io->off + addr, val);
 	return 1;
 }
 	

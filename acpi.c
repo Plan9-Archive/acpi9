@@ -314,8 +314,10 @@ run(void) {
 	 * Bad things happen when doing actual writes
 	 */
 	//setdummy(acpiio[EbctlSpace], 1);
+	//amldebug = 1;
 	amlenum(amlroot, "_INI", enumini, nil);
 	setdummy(acpiio[EbctlSpace], 0);
+	setdummy(acpiio[IoSpace], 0);
 	/* look for other ACPI devices */
 	amlenum(amlroot, "_HID", enumhid, nil);
 

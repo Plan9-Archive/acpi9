@@ -8,20 +8,10 @@ extern int ecread(Amlio*, void*, int, int);
 extern int ecwrite(Amlio*, void*, int, int);
 
 static int
-memread(Amlio *io, void *p, int len, int addr) {
-	print("memread: 0x%x\n", addr);
-	return pread(((Fileio*)io->aux)->fd, p, len, addr);
-}
-
-static int
-memwrite(Amlio *io, void *p, int len, int addr) {
+portread(Amlio *io, void *p, int, int addr) {
 	if(((Fileio*)io->aux)->dummy)
 		return -1;
-	return pwrite(((Fileio*)io->aux)->fd, p, len, addr);
-}
-
-static int
-portread(Amlio *io, void *p, int, int addr) {
+	//print("io->off = %ullx, addr = %d\n", io->off, addr);
 	return pread(((Fileio*)io->aux)->fd, p, 1, addr);
 }
 
@@ -29,6 +19,7 @@ static int
 portwrite(Amlio *io, void *p, int, int addr) {
 	if(((Fileio*)io->aux)->dummy)
 		return -1;
+	//print("io->off = %ullx, addr = %d\n", io->off, addr);
 	return pwrite(((Fileio*)io->aux)->fd, p, 1, addr);
 }
 
@@ -54,29 +45,70 @@ registerio(Amlio *io) {
 	acpiio[io->space] = io;
 }
 
+static void
+unregister(Amlio *io) {
+	extern Amlio* acpiio[8];
+
+	acpiio[io->space] = nil;
+
+}
+
+static int
+registered(Amlio *io) {
+	extern Amlio* acpiio[8];
+
+	return acpiio[io->space] != nil;
+}
+
+int memmap(Amlio *io) {
+	int fd;
+	uchar *buf;
+	Fileio *fio;
+
+	if (io->aux) {
+		fio = (Fileio*)io->aux;
+		fd = fio->fd;
+	} else {
+		if((fio = calloc(1, sizeof(*fio))) == nil)
+			sysfatal("ioinit: %r");
+		io->aux = fio;
+		if ((fio->fd = fd = open("/dev/acpimem", ORDWR)) == -1)
+			return -1;
+	}
+
+	if((buf = calloc(1, io->len)) == nil)
+		sysfatal("ioinit: %r");
+	io->va = buf;
+	pread(fd, buf, io->len, io->off);
+	return 0;
+}
+
 int amlmapio(Amlio *io) {
 	Fileio *fio;
 
 	switch(io->space) {
 		case MemSpace:
-			if(ioinit(io, "/dev/acpimem") != -1) {
-				io->read = memread;
-				io->write = memwrite;
-				registerio(io);
-				return 0;
+			if (registered(io)) {
+				unregister(io);
 			}
-			break;
+			return memmap(io);
 		case IoSpace:
+			if (registered(io)) {
+				unregister(io);
+			}
 			if(ioinit(io, "/dev/iob") != -1) {
 				io->read = portread;
 				io->write = portwrite;
+				((Fileio*)io->aux)->dummy = 1;
 				registerio(io);
 				return 0;
 			}
 			break;
 		case EbctlSpace:
+			if (registered(io)) {
+				unregister(io);
+			}
 			/* prey this shit is ready */
-			print("amlmapio ebctl\n!");
 			io->read = ecread;
 			io->write = ecwrite;
 			if((fio = calloc(1, sizeof(*fio))) == nil)
@@ -84,10 +116,9 @@ int amlmapio(Amlio *io) {
 			io->aux = fio;
 			fio->dummy = 1;
 			registerio(io);
-			print("amlmalio ebctl exit\n");
 			return 0;
 		default:
-			print("unknown I/O space %d", io->space);
+			print("Not supported I/O space %d\n", io->space);
 	}
 	return -1;
 }
