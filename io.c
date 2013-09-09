@@ -4,66 +4,100 @@
 
 #include "acpi.h"
 
+extern int ecread(Amlio*, void*, int, int);
+extern int ecwrite(Amlio*, void*, int, int);
+
 static int
-memread(struct acpiio *io, void *p, int addr, int len) {
+memread(Amlio *io, void *p, int addr, int len) {
 	print("memread: 0x%x\n", addr);
-	return pread(io->fd, p, len, addr);
+	return pread(((Fileio*)io->aux)->fd, p, len, addr);
 }
 
 static int
-memwrite(struct acpiio *io, void *p, int addr, int len) {
-	if(io->dummy)
+memwrite(Amlio *io, void *p, int addr, int len) {
+	if(((Fileio*)io->aux)->dummy)
 		return -1;
 	uvlong val = *(uvlong*)p;
 	print("memwrite: 0x%x\n", addr);
-	return pwrite(io->fd, &val, len, addr);
+	return pwrite(((Fileio*)io->aux)->fd, &val, len, addr);
 }
 
 static int
-portread(struct acpiio *io, void *p, int addr, int) {
-	return pread(io->fd, p, 1, addr);
+portread(Amlio *io, void *p, int addr, int) {
+	return pread(((Fileio*)io->aux)->fd, p, 1, addr);
 }
 
 static int
-portwrite(struct acpiio *io, void *p, int addr, int) {
-	if(io->dummy)
+portwrite(Amlio *io, void *p, int addr, int) {
+	if(((Fileio*)io->aux)->dummy)
 		return -1;
 	uvlong val = *(uvlong*)p;
-	return pwrite(io->fd, &val, 1, addr);
+	return pwrite(((Fileio*)io->aux)->fd, &val, 1, addr);
 }
 
-static struct acpiio*
-ioinit(char *name) {
+static int
+ioinit(Amlio *io, char *name) {
 	int fd;
-	struct acpiio *io;
+	Fileio *fio;
 
 	if((fd = open(name, ORDWR)) != -1) {
-		if((io = calloc(1, sizeof(*io))) == nil)
+		if((fio = calloc(1, sizeof(*fio))) == nil)
 			sysfatal("ioinit: %r");
-		io->fd = fd;
-		return io;
+		fio->fd = fd;
+		io->aux = fio;
+		return 0;
 	} 
-	return nil;
+	return -1;
 }
 
-AcpiIo*
-meminit(char *file){
-	AcpiIo *io;
+static void
+registerio(Amlio *io) {
+	extern Amlio* acpiio[8];
 
-	if((io = ioinit(file)) == nil)
-		return nil;
-	io->write = memwrite;
-	io->read = memread;
-	return io;
+	acpiio[io->space] = io;
 }
 
-AcpiIo*
-portinit(char *file){
-	AcpiIo *io;
+int amlmapio(Amlio *io) {
+	switch(io->space) {
+		case MemSpace:
+			if(ioinit(io, "/dev/acpimem") != -1) {
+				io->read = memread;
+				io->write = memwrite;
+				registerio(io);
+				return 0;
+			}
+			break;
+		case IoSpace:
+			if(ioinit(io, "/dev/iob") != -1) {
+				io->read = portread;
+				io->write = portwrite;
+				registerio(io);
+				return 0;
+			}
+			break;
+		case EbctlSpace:
+			/* prey this shit is ready */
+			io->read = ecread;
+			io->write = ecwrite;
+			((Fileio*)io->aux)->dummy = 1;
+			registerio(io);
+			return 0;
+		default:
+			print("unknown I/O space %d", io->space);
+	}
+	return -1;
+}
 
-	if((io = ioinit(file)) == nil)
-		return nil;
-	io->write = portwrite;
-	io->read = portread;
-	return io;
+void amlunmapio(Amlio *io) {
+	Fileio *fio;
+
+	fio = (Fileio*)io->aux;
+	if (fio != nil) {
+		close(fio->fd);
+		free(fio);
+	}
+}
+
+void setdummy(Amlio *io, int val) {
+	((Fileio*)io->aux)->dummy = val;
 }

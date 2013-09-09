@@ -18,18 +18,12 @@ struct acpidev {
 	void 	*data;
 };
 
-/* talk to the kernel */
-typedef struct acpiio AcpiIo;
-
-struct acpiio;
-struct acpiio {
+typedef struct fileio Fileio;
+struct fileio {
 	int fd, dummy;
-	int (*read)(AcpiIo*, void*, int, int);
-	int (*write)(AcpiIo*, void*, int, int);
 };
 
-extern struct acpiio* portinit(char*);
-extern struct acpiio* meminit(char*);
+extern void setdummy(Amlio*, int);
 
 File* mkdir(File *, char *);
 File* mkfile(File *, char *, void *);

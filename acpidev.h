@@ -4,8 +4,8 @@
 
 /* Embedded Controller */
 void acpiec_init(void*, void*);
-int ecread(AcpiIo*, void*, int, int);
-int ecwrite(AcpiIo*, void*, int, int);
+int ecread(Amlio*, void*, int, int);
+int ecwrite(Amlio*, void*, int, int);
 
 /* AC */
 int acpiac_attach(struct acpidev *);

@@ -19,7 +19,7 @@ struct Tbl {
 };
 
 /* for each defined space */
-static AcpiIo* acpiio[8];
+Amlio* acpiio[8];
 
 static Tbl *tbltab[64];
 
@@ -267,19 +267,12 @@ run(void) {
 	Tbl *t;
 
 	p = gettables(&len);
-
-	acpiio[IoSpace] = portinit("/dev/iob");
-	acpiio[MemSpace] = meminit("/dev/acpimem");
-
 	amlinit();
 
 	tp = p;
 
 	if(t = findtable(tp, "ECDT", len - (tp - p))) {
 			acpiec_init(nil, t->data);
-			acpiio[EbctlSpace] = calloc(1, sizeof(*acpiio[EbctlSpace]));
-			acpiio[EbctlSpace]->write = ecwrite;
-			acpiio[EbctlSpace]->read = ecread;
 	}
 	tp = p;
 
@@ -319,9 +312,9 @@ run(void) {
 	/* 
 	 * Bad things happen when doing actual writes
 	 */
-	acpiio[EbctlSpace]->dummy = 1;
+	//setdummy(acpiio[EbctlSpace], 1);
 	amlenum(amlroot, "_INI", enumini, nil);
- 	acpiio[EbctlSpace]->dummy = 0;
+	setdummy(acpiio[EbctlSpace], 0);
 
 	/* look for other ACPI devices */
 	amlenum(amlroot, "_HID", enumhid, nil);
