@@ -46,7 +46,7 @@ static uchar
 inb(int off){
 	uvlong val;
 
-	amlio(IoSpace, 'R', &val, off, 1);
+	amlio(IoSpace, 'R', &val, 1, off);
 	return val;
 }
 
@@ -55,7 +55,7 @@ outb(int off, uchar v){
 	uvlong val;
 
 	val = v;
-	amlio(IoSpace, 'W', &val, off, 1);
+	amlio(IoSpace, 'W', &val, 1, off);
 }
 
 static void
@@ -118,15 +118,17 @@ acpiec_write(uchar addr, uvlong val)
 }
 
 int
-ecread(Amlio*, void *p, int addr, int){
+ecread(Amlio*, void *p, int len, int addr){
 	*(uchar*)p = acpiec_read(addr);
 	return 1;
 }
 
 int
-ecwrite(Amlio *io, void *p, int addr, int){
-	if(((Fileio*)io->aux)->dummy)
+ecwrite(Amlio *io, void *p, int, int addr){
+	if(((Fileio*)io->aux)->dummy) {
+		*(char*)p = 0;
 		return -1;
+	}
 	uvlong val = *(uvlong*)p;
 	acpiec_write(addr, val);
 	return 1;
@@ -177,9 +179,17 @@ acpiec_init(void *dot, void *tbl)
 	int rv, size, t;
 	int ec_sc, ec_data;
 	struct Ecdt *ecdt = tbl;
+	struct Amlio *io;
 
 	if(ec.ready)
 		return;
+	/* we need port I/O working */
+	if ((io = calloc(1, sizeof(*io))) == nil)
+		sysfatal("failed to alloc port i/o");
+	io->space = IoSpace;
+	if(amlmapio(io) == -1)
+		sysfatal("Cannot map I/O space");
+
 	if(ecdt != nil) {
 		ecdt = (struct Ecdt*)tbl;
 		ec_sc = get64(ecdt->ec_cmd.addr);

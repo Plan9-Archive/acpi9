@@ -19,7 +19,7 @@ struct Tbl {
 };
 
 /* for each defined space */
-Amlio* acpiio[8];
+Amlio* acpiio[8] = { nil };
 
 static Tbl *tbltab[64];
 
@@ -44,16 +44,16 @@ get64(uchar *p){
 }
 
 int
-amlio(uchar space, char op, void *buf, int off, int len){
+amlio(uchar space, char op, void *buf, int len, int off){
+	//print("amlio[%c]: space=%d off=%d len=%d\n", op, space, off, len);
 	if(acpiio[space] == nil){
-		/*print("space[%d] io not implemented\n", space);*/
+		print("space[%d] io not implemented\n", space);
 		return -1;
 	}
 	if(op == 'R'){
-		return acpiio[space]->read(acpiio[space], buf, off, len);
-		/*print("amlio[R]: space=%d off=%ulld len=%d %ulld\n", space, off, len, buf[0]);*/
+		return acpiio[space]->read(acpiio[space], buf, len, off);
 	}else
-		return acpiio[space]->write(acpiio[space], buf, off, len);
+		return acpiio[space]->write(acpiio[space], buf, len, off);
 }
 
 void 
@@ -309,18 +309,20 @@ run(void) {
 	}
 	if(i == 0)
 		fprint(2, "SSDT not found\n");
+	
 	/* 
 	 * Bad things happen when doing actual writes
 	 */
 	//setdummy(acpiio[EbctlSpace], 1);
 	amlenum(amlroot, "_INI", enumini, nil);
 	setdummy(acpiio[EbctlSpace], 0);
-
 	/* look for other ACPI devices */
 	amlenum(amlroot, "_HID", enumhid, nil);
 
 	/* cpu power and throttling states */
 	amlenum(amlroot, "_PDC", foundpdc, nil);
+
+
 } 
 
 void
